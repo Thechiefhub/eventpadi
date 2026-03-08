@@ -1,1 +1,4 @@
 project_id = "bcadcdukmcaimiuwzxna"
+
+[functions.spark-generate]
+verify_jwt = false
