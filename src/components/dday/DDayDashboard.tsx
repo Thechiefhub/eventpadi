@@ -174,6 +174,7 @@ export default function DDayDashboard({ attendees, isAdmin = false }: Props) {
         attendees={attendees}
         filter={modalFilter}
         title={modalTitle}
+        isAdmin={isAdmin}
       />
     </div>
   );
