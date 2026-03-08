@@ -4,7 +4,8 @@
  */
 
 import { useState } from "react";
-import { Star, Heart, Copy, Check, Download, RotateCcw } from "lucide-react";
+import { Star, Heart, Copy, Check, Download, RotateCcw, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -90,10 +91,13 @@ export default function SparkResults({
             {categories.reduce((sum, c) => sum + c.names.length, 0)} names generated
           </Badge>
           {shortlisted.size > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <Heart className="h-3 w-3 fill-[hsl(var(--kente-red))] text-[hsl(var(--kente-red))]" />
-              {shortlisted.size} shortlisted
-            </Badge>
+            <Link to="/dashboard/shortlist">
+              <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted transition-colors">
+                <Heart className="h-3 w-3 fill-[hsl(var(--kente-red))] text-[hsl(var(--kente-red))]" />
+                {shortlisted.size} shortlisted
+                <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
+              </Badge>
+            </Link>
           )}
         </div>
         <div className="flex gap-2">
