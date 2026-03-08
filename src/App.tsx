@@ -14,6 +14,7 @@ import SparkModule from "./pages/SparkModule";
 import ChaseModule from "./pages/ChaseModule";
 import BuzzModule from "./pages/BuzzModule";
 import EngineModule from "./pages/EngineModule";
+import DDayModule from "./pages/DDayModule";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="chase" element={<ChaseModule />} />
               <Route path="buzz" element={<BuzzModule />} />
               <Route path="engine" element={<EngineModule />} />
+              <Route path="dday" element={<DDayModule />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
