@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Handshake, Search, FileText, Building2, Globe, Mail, ExternalLink, Loader2, Copy, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Handshake, Search, FileText, Building2, Globe, Mail, ExternalLink, Loader2, Copy, CheckCircle2, Clock, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 const sponsors = [
   { name: "MTN Group", category: "Telco", country: "Pan-African", events: 12, contact: "partnerships@mtn.com", insight: "Sponsored AfroTech Lagos 2023 & 2024" },
@@ -29,21 +31,43 @@ interface PitchResult {
   follow_up_suggestion: string;
 }
 
-interface SelectedSponsor {
-  name: string;
-  category: string;
-  country: string;
-  insight: string;
+interface SponsorContact {
+  id: string;
+  sponsor_name: string;
+  tier: string | null;
+  status: string | null;
+  pitch_letter: string | null;
+  contacted_at: string | null;
+  follow_up_date: string | null;
+  event_id: string;
+  created_at: string;
 }
 
+const statusColors: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  contacted: "bg-primary/15 text-primary",
+  "follow-up": "bg-sunset-gold/15 text-sunset-gold",
+  confirmed: "bg-earth-green/15 text-earth-green",
+  declined: "bg-destructive/15 text-destructive",
+};
+
+const statusOptions = ["draft", "contacted", "follow-up", "confirmed", "declined"];
+
 export default function ChaseModule() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("all");
   const [category, setCategory] = useState("all");
 
+  // Events for CRM
+  const [events, setEvents] = useState<{ id: string; name: string }[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [contacts, setContacts] = useState<SponsorContact[]>([]);
+  const [crmLoading, setCrmLoading] = useState(false);
+
   // Pitch dialog state
   const [pitchOpen, setPitchOpen] = useState(false);
-  const [selectedSponsor, setSelectedSponsor] = useState<SelectedSponsor | null>(null);
+  const [selectedSponsor, setSelectedSponsor] = useState<typeof sponsors[0] | null>(null);
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventCity, setEventCity] = useState("");
@@ -52,6 +76,29 @@ export default function ChaseModule() {
   const [loading, setLoading] = useState(false);
   const [pitch, setPitch] = useState<PitchResult | null>(null);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("events").select("id, name").order("created_at", { ascending: false }).then(({ data }) => {
+      const evts = data || [];
+      setEvents(evts);
+      if (evts.length > 0 && !selectedEvent) setSelectedEvent(evts[0].id);
+    });
+  }, [user]);
+
+  const fetchContacts = async () => {
+    if (!selectedEvent) return;
+    setCrmLoading(true);
+    const { data } = await supabase
+      .from("sponsor_contacts")
+      .select("*")
+      .eq("event_id", selectedEvent)
+      .order("created_at", { ascending: false });
+    setContacts(data || []);
+    setCrmLoading(false);
+  };
+
+  useEffect(() => { fetchContacts(); }, [selectedEvent]);
+
   const filtered = sponsors.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
     const matchCountry = country === "all" || s.country === country;
@@ -59,9 +106,12 @@ export default function ChaseModule() {
     return matchSearch && matchCountry && matchCategory;
   });
 
-  const openPitchDialog = (sponsor: SelectedSponsor) => {
+  const openPitchDialog = (sponsor: typeof sponsors[0]) => {
     setSelectedSponsor(sponsor);
     setPitch(null);
+    // Pre-fill event name if we have one selected
+    const evt = events.find((e) => e.id === selectedEvent);
+    if (evt) setEventName(evt.name);
     setPitchOpen(true);
   };
 
@@ -95,6 +145,49 @@ export default function ChaseModule() {
     }
   };
 
+  const saveSponsorContact = async (status: string) => {
+    if (!user || !selectedEvent || !selectedSponsor || !pitch) return;
+
+    try {
+      const { error } = await supabase.from("sponsor_contacts").insert({
+        user_id: user.id,
+        event_id: selectedEvent,
+        sponsor_name: selectedSponsor.name,
+        tier,
+        status,
+        pitch_letter: `Subject: ${pitch.subject_line}\n\n${pitch.letter}`,
+        contacted_at: status === "contacted" ? new Date().toISOString() : null,
+        follow_up_date: status === "contacted"
+          ? new Date(Date.now() + 5 * 86400000).toISOString().split("T")[0]
+          : null,
+      });
+
+      if (error) throw error;
+      toast.success(`${selectedSponsor.name} saved as "${status}"!`);
+      setPitchOpen(false);
+      fetchContacts();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save contact.");
+    }
+  };
+
+  const updateContactStatus = async (id: string, newStatus: string) => {
+    const updates: Record<string, any> = { status: newStatus };
+    if (newStatus === "contacted" && !contacts.find((c) => c.id === id)?.contacted_at) {
+      updates.contacted_at = new Date().toISOString();
+      updates.follow_up_date = new Date(Date.now() + 5 * 86400000).toISOString().split("T")[0];
+    }
+    const { error } = await supabase.from("sponsor_contacts").update(updates).eq("id", id);
+    if (error) toast.error(error.message);
+    else fetchContacts();
+  };
+
+  const deleteContact = async (id: string) => {
+    const { error } = await supabase.from("sponsor_contacts").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { setContacts((prev) => prev.filter((c) => c.id !== id)); toast.success("Removed"); }
+  };
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard!`);
@@ -109,73 +202,183 @@ export default function ChaseModule() {
         <p className="text-muted-foreground mt-1">Find sponsors, generate pitch letters & track your partnerships.</p>
       </div>
 
-      {/* Filters */}
-      <Card className="border-border">
-        <CardContent className="p-4 flex flex-col md:flex-row gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search sponsors..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <Select value={country} onValueChange={setCountry}>
-            <SelectTrigger className="w-full md:w-44"><SelectValue placeholder="Country" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Countries</SelectItem>
-              <SelectItem value="Nigeria">Nigeria</SelectItem>
-              <SelectItem value="Kenya">Kenya</SelectItem>
-              <SelectItem value="South Africa">South Africa</SelectItem>
-              <SelectItem value="Pan-African">Pan-African</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-full md:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="Telco">Telco</SelectItem>
-              <SelectItem value="Banking">Banking</SelectItem>
-              <SelectItem value="Beverages">Beverages</SelectItem>
-              <SelectItem value="Tech">Tech</SelectItem>
-              <SelectItem value="NGO">NGO</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="database" className="w-full">
+        <TabsList className="bg-muted">
+          <TabsTrigger value="database">Sponsor Database</TabsTrigger>
+          <TabsTrigger value="tracker">
+            Partnership Tracker
+            {contacts.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">{contacts.length}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Sponsor List */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map((sponsor) => (
-          <Card key={sponsor.name} className="border-border hover:shadow-warm transition-all duration-300">
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-muted p-2.5">
-                    <Building2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-semibold text-foreground">{sponsor.name}</h3>
-                    <div className="flex gap-2 mt-0.5">
-                      <Badge variant="secondary" className="text-xs">{sponsor.category}</Badge>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" />{sponsor.country}</span>
-                    </div>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs">{sponsor.events} events</Badge>
+        {/* ─── Sponsor Database Tab ─── */}
+        <TabsContent value="database" className="mt-6 space-y-6">
+          <Card className="border-border">
+            <CardContent className="p-4 flex flex-col md:flex-row gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search sponsors..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <p className="text-sm text-muted-foreground italic">"{sponsor.insight}"</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Mail className="h-3 w-3" /> {sponsor.contact}
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button variant="hero" size="sm" className="flex-1" onClick={() => openPitchDialog(sponsor)}>
-                  <FileText className="h-4 w-4 mr-1" /> Write Pitch
-                </Button>
-                <Button variant="outline" size="sm">
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger className="w-full md:w-44"><SelectValue placeholder="Country" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Countries</SelectItem>
+                  <SelectItem value="Nigeria">Nigeria</SelectItem>
+                  <SelectItem value="Kenya">Kenya</SelectItem>
+                  <SelectItem value="South Africa">South Africa</SelectItem>
+                  <SelectItem value="Pan-African">Pan-African</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="w-full md:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Telco">Telco</SelectItem>
+                  <SelectItem value="Banking">Banking</SelectItem>
+                  <SelectItem value="Beverages">Beverages</SelectItem>
+                  <SelectItem value="Tech">Tech</SelectItem>
+                  <SelectItem value="NGO">NGO</SelectItem>
+                </SelectContent>
+              </Select>
             </CardContent>
           </Card>
-        ))}
-      </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {filtered.map((sponsor) => (
+              <Card key={sponsor.name} className="border-border hover:shadow-warm transition-all duration-300">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-muted p-2.5">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-semibold text-foreground">{sponsor.name}</h3>
+                        <div className="flex gap-2 mt-0.5">
+                          <Badge variant="secondary" className="text-xs">{sponsor.category}</Badge>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" />{sponsor.country}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs">{sponsor.events} events</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground italic">"{sponsor.insight}"</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Mail className="h-3 w-3" /> {sponsor.contact}
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="hero" size="sm" className="flex-1" onClick={() => openPitchDialog(sponsor)}>
+                      <FileText className="h-4 w-4 mr-1" /> Write Pitch
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* ─── Partnership Tracker Tab ─── */}
+        <TabsContent value="tracker" className="mt-6 space-y-6">
+          {events.length > 0 ? (
+            <>
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger className="w-full md:w-72">
+                  <SelectValue placeholder="Select an event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Stats row */}
+              {contacts.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {statusOptions.map((s) => {
+                    const count = contacts.filter((c) => c.status === s).length;
+                    return (
+                      <Card key={s} className="border-border">
+                        <CardContent className="p-3 text-center">
+                          <p className="text-2xl font-display font-bold text-foreground">{count}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{s}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {crmLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : contacts.length === 0 ? (
+                <Card className="border-border">
+                  <CardContent className="p-8 text-center space-y-2">
+                    <Handshake className="h-10 w-10 mx-auto text-muted-foreground/40" />
+                    <p className="text-muted-foreground">No sponsors tracked yet. Use the Sponsor Database tab to write a pitch and save it here.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {contacts.map((contact) => (
+                    <Card key={contact.id} className="border-border">
+                      <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="rounded-lg bg-muted p-2">
+                            <Building2 className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-display font-semibold text-foreground truncate">{contact.sponsor_name}</h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                              <Badge variant="outline" className="text-xs capitalize">{contact.tier}</Badge>
+                              {contact.contacted_at && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Send className="h-3 w-3" /> {format(new Date(contact.contacted_at), "MMM d")}
+                                </span>
+                              )}
+                              {contact.follow_up_date && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> Follow up: {contact.follow_up_date}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select value={contact.status || "draft"} onValueChange={(v) => updateContactStatus(contact.id, v)}>
+                            <SelectTrigger className={`w-32 text-xs capitalize ${statusColors[contact.status || "draft"]}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statusOptions.map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => deleteContact(contact.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <Card className="border-border">
+              <CardContent className="p-6 text-center text-muted-foreground">
+                Create an event first to track sponsor partnerships.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Pitch Dialog */}
       <Dialog open={pitchOpen} onOpenChange={setPitchOpen}>
@@ -241,7 +444,6 @@ export default function ChaseModule() {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Subject Line */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Subject Line</Label>
                 <div className="flex items-center gap-2 rounded-lg border border-border p-3 bg-muted/50">
@@ -252,7 +454,6 @@ export default function ChaseModule() {
                 </div>
               </div>
 
-              {/* Letter */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">Pitch Letter</Label>
@@ -265,7 +466,6 @@ export default function ChaseModule() {
                 </div>
               </div>
 
-              {/* Benefits */}
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Sponsor Benefits ({tier})</Label>
                 <ul className="space-y-1">
@@ -277,7 +477,6 @@ export default function ChaseModule() {
                 </ul>
               </div>
 
-              {/* Follow-up */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Suggested Follow-up (5 days later)</Label>
                 <div className="rounded-lg border border-border p-3 bg-muted/50 text-sm text-muted-foreground italic">
@@ -285,17 +484,28 @@ export default function ChaseModule() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setPitch(null)}>
                   Regenerate
                 </Button>
-                <Button
-                  variant="hero"
-                  className="flex-1"
-                  onClick={() => copyToClipboard(`Subject: ${pitch.subject_line}\n\n${pitch.letter}`, "Full pitch")}
-                >
-                  <Copy className="h-4 w-4 mr-1" /> Copy Full Pitch
-                </Button>
+                {selectedEvent ? (
+                  <>
+                    <Button variant="outline" className="flex-1" onClick={() => saveSponsorContact("draft")}>
+                      Save as Draft
+                    </Button>
+                    <Button variant="hero" className="flex-1" onClick={() => saveSponsorContact("contacted")}>
+                      <Send className="h-4 w-4 mr-1" /> Mark Contacted
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="hero"
+                    className="flex-1"
+                    onClick={() => copyToClipboard(`Subject: ${pitch.subject_line}\n\n${pitch.letter}`, "Full pitch")}
+                  >
+                    <Copy className="h-4 w-4 mr-1" /> Copy Full Pitch
+                  </Button>
+                )}
               </div>
             </div>
           )}
