@@ -28,7 +28,7 @@ import BadgeGenerator from "@/components/dday/BadgeGenerator";
 
 export default function DDayModule() {
   const { events, selectedEventId, setSelectedEventId, loading: eventsLoading } = useEventSelect();
-  const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn } = useAttendees(selectedEventId);
+  const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId);
 
   if (eventsLoading) {
     return (
