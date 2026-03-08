@@ -104,6 +104,36 @@ export default function VisualIdentityStudio() {
     }
   };
 
+  const handleRefine = async (index: number) => {
+    if (!editPrompt.trim()) return;
+    const img = images[index];
+    if (!img) return;
+
+    setEditLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spark-visual", {
+        body: {
+          mode: "edit",
+          sourceUrl: img.url,
+          editInstruction: editPrompt,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      const newImage = data.image as GeneratedImage;
+      setImages((prev) => prev.map((im, i) => (i === index ? newImage : im)));
+      setEditingIndex(null);
+      setEditPrompt("");
+      toast.success("Image refined successfully!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to refine image.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   return (
     <Card className="border-border">
       <CardHeader>
