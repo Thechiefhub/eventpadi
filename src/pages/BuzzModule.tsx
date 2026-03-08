@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Megaphone, Calendar, Image, Send, Plus, Loader2, Trash2 } from "lucide-react";
+import { Megaphone, Calendar, Image, Send, Plus, Loader2, Trash2, Sparkles, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,13 @@ export default function BuzzModule() {
   const [newDate, setNewDate] = useState("");
   const [newContent, setNewContent] = useState("");
   const [adding, setAdding] = useState(false);
+
+  // AI generate dialog
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPost, setAiPost] = useState<ContentPost | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiCaption, setAiCaption] = useState("");
+  const [aiHashtags, setAiHashtags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -140,6 +147,63 @@ export default function BuzzModule() {
     else toast.success("90-day calendar loaded!");
     await fetchPosts();
     setAdding(false);
+  };
+
+  const generateCaption = async (post: ContentPost) => {
+    setAiPost(post);
+    setAiDialogOpen(true);
+    setAiGenerating(true);
+    setAiCaption("");
+    setAiHashtags([]);
+
+    const eventName = events.find((e) => e.id === post.event_id)?.name || "Our Event";
+
+    try {
+      const { data, error } = await supabase.functions.invoke("buzz-generate", {
+        body: {
+          title: post.title,
+          platform: post.platform,
+          phase: post.phase,
+          eventName,
+        },
+      });
+
+      if (error) {
+        toast.error("AI generation failed. Please try again.");
+        setAiGenerating(false);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        setAiGenerating(false);
+        return;
+      }
+
+      setAiCaption(data.caption || "");
+      setAiHashtags(data.hashtags || []);
+    } catch (e) {
+      toast.error("Failed to generate caption.");
+    }
+    setAiGenerating(false);
+  };
+
+  const useCaption = async () => {
+    if (!aiPost) return;
+    const fullContent = aiCaption + "\n\n" + aiHashtags.map((h) => `#${h}`).join(" ");
+    const { error } = await supabase.from("content_posts").update({ content: fullContent }).eq("id", aiPost.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Caption saved to post!");
+      setPosts((prev) => prev.map((p) => p.id === aiPost.id ? { ...p, content: fullContent } : p));
+      setAiDialogOpen(false);
+    }
+  };
+
+  const copyCaption = () => {
+    const fullContent = aiCaption + "\n\n" + aiHashtags.map((h) => `#${h}`).join(" ");
+    navigator.clipboard.writeText(fullContent);
+    toast.success("Copied to clipboard!");
   };
 
   const grouped = phases.reduce((acc, phase) => {
@@ -270,10 +334,23 @@ export default function BuzzModule() {
                                   {format(new Date(post.scheduled_date), "MMM d")}
                                 </span>
                               )}
-                              <span className="font-medium text-foreground text-sm truncate">{post.title}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-medium text-foreground text-sm truncate">{post.title}</span>
+                                {post.content && (
+                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">{post.content.slice(0, 60)}…</span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <Badge variant="outline" className="text-xs">{post.platform}</Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-primary hover:text-primary/80 gap-1"
+                                onClick={() => generateCaption(post)}
+                              >
+                                <Sparkles className="h-3.5 w-3.5" /> AI
+                              </Button>
                               <Select value={post.status || "draft"} onValueChange={(v) => updateStatus(post.id, v)}>
                                 <SelectTrigger className={`w-28 h-7 text-xs capitalize ${statusColors[post.status || "draft"]}`}>
                                   <SelectValue />
@@ -321,6 +398,66 @@ export default function BuzzModule() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* AI Caption Generator Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" /> AI Caption Generator
+            </DialogTitle>
+          </DialogHeader>
+          {aiPost && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-3">
+                <p className="text-sm font-medium text-foreground">{aiPost.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {aiPost.platform} · {phaseLabels[aiPost.phase || "launch"]?.label} Phase
+                </p>
+              </div>
+
+              {aiGenerating ? (
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Crafting your caption…</p>
+                </div>
+              ) : aiCaption ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Caption</Label>
+                    <div className="rounded-lg border border-border p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                      {aiCaption}
+                    </div>
+                  </div>
+                  {aiHashtags.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hashtags</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {aiHashtags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">#{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="hero" className="flex-1" onClick={useCaption}>
+                      Save to Post
+                    </Button>
+                    <Button variant="outline" onClick={copyCaption}>
+                      <Copy className="h-4 w-4 mr-1" /> Copy
+                    </Button>
+                    <Button variant="outline" onClick={() => generateCaption(aiPost)}>
+                      <Sparkles className="h-4 w-4 mr-1" /> Regenerate
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Something went wrong. Try again.</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
