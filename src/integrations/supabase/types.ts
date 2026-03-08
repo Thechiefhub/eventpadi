@@ -286,6 +286,59 @@ export type Database = {
         }
         Relationships: []
       }
+      shortlisted_names: {
+        Row: {
+          category: string | null
+          chosen: boolean | null
+          created_at: string
+          event_id: string | null
+          generation_context: Json | null
+          id: string
+          name: string
+          rating: number | null
+          rationale: string | null
+          tagline: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          chosen?: boolean | null
+          created_at?: string
+          event_id?: string | null
+          generation_context?: Json | null
+          id?: string
+          name: string
+          rating?: number | null
+          rationale?: string | null
+          tagline?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          chosen?: boolean | null
+          created_at?: string
+          event_id?: string | null
+          generation_context?: Json | null
+          id?: string
+          name?: string
+          rating?: number | null
+          rationale?: string | null
+          tagline?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shortlisted_names_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sponsor_contacts: {
         Row: {
           contacted_at: string | null
