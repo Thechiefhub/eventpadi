@@ -15,7 +15,7 @@
  * Real-time: All stats update live across all logged-in team members via WebSockets.
  */
 
-import { CalendarCheck, UserCheck, Users, Shield } from "lucide-react";
+import { CalendarCheck, UserCheck, Users, Shield, QrCode } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEventSelect } from "@/hooks/useEventSelect";
@@ -24,6 +24,7 @@ import DDayDashboard from "@/components/dday/DDayDashboard";
 import CheckInInterface from "@/components/dday/CheckInInterface";
 import AttendeeUpload from "@/components/dday/AttendeeUpload";
 import TeamManager from "@/components/dday/TeamManager";
+import BadgeGenerator from "@/components/dday/BadgeGenerator";
 
 export default function DDayModule() {
   const { events, selectedEventId, setSelectedEventId, loading: eventsLoading } = useEventSelect();
@@ -74,7 +75,7 @@ export default function DDayModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full">
+        <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
             <Users className="h-4 w-4 mr-1 hidden sm:inline" /> Dashboard
           </TabsTrigger>
@@ -83,6 +84,9 @@ export default function DDayModule() {
           </TabsTrigger>
           <TabsTrigger value="attendees" className="text-xs sm:text-sm">
             Attendees
+          </TabsTrigger>
+          <TabsTrigger value="badges" className="text-xs sm:text-sm">
+            <QrCode className="h-4 w-4 mr-1 hidden sm:inline" /> Badges
           </TabsTrigger>
           <TabsTrigger value="team" className="text-xs sm:text-sm">
             <Shield className="h-4 w-4 mr-1 hidden sm:inline" /> Team
@@ -99,6 +103,13 @@ export default function DDayModule() {
 
         <TabsContent value="attendees" className="mt-4">
           <AttendeeUpload eventId={selectedEventId} attendees={attendees} onUploaded={fetchAttendees} />
+        </TabsContent>
+
+        <TabsContent value="badges" className="mt-4">
+          <BadgeGenerator
+            attendees={attendees}
+            eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
+          />
         </TabsContent>
 
         <TabsContent value="team" className="mt-4">
