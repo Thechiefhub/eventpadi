@@ -54,11 +54,23 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{attendees.length} badge(s) ready</p>
-        <Button onClick={handlePrint} className="gradient-sunset text-primary-foreground">
-          <Printer className="h-4 w-4 mr-1" /> Print All Badges
-        </Button>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div>
+          <p className="text-sm text-muted-foreground">{attendees.length} badge(s) ready</p>
+          {missingCount > 0 && (
+            <p className="text-xs text-[hsl(var(--kente-red))]">{missingCount} attendee(s) missing ticket IDs</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {missingCount > 0 && onGenerateMissingIds && (
+            <Button variant="outline" size="sm" onClick={onGenerateMissingIds}>
+              <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
+            </Button>
+          )}
+          <Button onClick={handlePrint} className="gradient-sunset text-primary-foreground">
+            <Printer className="h-4 w-4 mr-1" /> Print All Badges
+          </Button>
+        </div>
       </div>
 
       {/* Visible preview (first 6) */}
