@@ -14,7 +14,222 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      checklist_items: {
+        Row: {
+          category: string
+          created_at: string
+          due_date: string | null
+          event_id: string
+          id: string
+          is_completed: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          due_date?: string | null
+          event_id: string
+          id?: string
+          is_completed?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          due_date?: string | null
+          event_id?: string
+          id?: string
+          is_completed?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_posts: {
+        Row: {
+          content: string | null
+          created_at: string
+          event_id: string
+          id: string
+          phase: string | null
+          platform: string | null
+          scheduled_date: string | null
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          phase?: string | null
+          platform?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          phase?: string | null
+          platform?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_posts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string
+          event_date: string | null
+          event_type: string | null
+          id: string
+          name: string
+          progress: number | null
+          tagline: string | null
+          theme_statement: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          event_date?: string | null
+          event_type?: string | null
+          id?: string
+          name: string
+          progress?: number | null
+          tagline?: string | null
+          theme_statement?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          event_date?: string | null
+          event_type?: string | null
+          id?: string
+          name?: string
+          progress?: number | null
+          tagline?: string | null
+          theme_statement?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sponsor_contacts: {
+        Row: {
+          contacted_at: string | null
+          created_at: string
+          event_id: string
+          follow_up_date: string | null
+          id: string
+          pitch_letter: string | null
+          sponsor_name: string
+          status: string | null
+          tier: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contacted_at?: string | null
+          created_at?: string
+          event_id: string
+          follow_up_date?: string | null
+          id?: string
+          pitch_letter?: string | null
+          sponsor_name: string
+          status?: string | null
+          tier?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contacted_at?: string | null
+          created_at?: string
+          event_id?: string
+          follow_up_date?: string | null
+          id?: string
+          pitch_letter?: string | null
+          sponsor_name?: string
+          status?: string | null
+          tier?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_contacts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
