@@ -109,6 +109,7 @@ export default function DDayModule() {
           <BadgeGenerator
             attendees={attendees}
             eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
+            onGenerateMissingIds={generateMissingTicketIds}
           />
         </TabsContent>
 
