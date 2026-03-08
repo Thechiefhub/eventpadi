@@ -15,6 +15,7 @@ import ChaseModule from "./pages/ChaseModule";
 import BuzzModule from "./pages/BuzzModule";
 import EngineModule from "./pages/EngineModule";
 import DDayModule from "./pages/DDayModule";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route
               path="/dashboard"
               element={
