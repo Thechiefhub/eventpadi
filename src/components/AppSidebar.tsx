@@ -1,8 +1,9 @@
-import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, Plus, LogOut } from "lucide-react";
+import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import NewEventDialog from "@/components/NewEventDialog";
 
 import {
   Sidebar,
@@ -32,7 +33,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -84,9 +85,7 @@ export function AppSidebar() {
       <SidebarFooter className="space-y-2">
         {!collapsed && (
           <>
-            <Button variant="hero" className="w-full" size="sm">
-              <Plus className="h-4 w-4 mr-1" /> New Event
-            </Button>
+            <NewEventDialog />
             <Button variant="ghost" className="w-full text-sidebar-foreground/70 hover:text-sidebar-foreground" size="sm" onClick={signOut}>
               <LogOut className="h-4 w-4 mr-1" /> Sign Out
             </Button>
