@@ -41,10 +41,10 @@ const Index = () => {
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
-              <Link to="/dashboard">Login</Link>
+              <Link to="/auth">Login</Link>
             </Button>
             <Button variant="hero" asChild>
-              <Link to="/dashboard">Get Started</Link>
+              <Link to="/auth">Get Started</Link>
             </Button>
           </div>
         </div>
