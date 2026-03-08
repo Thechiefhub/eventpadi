@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Users, UserCheck, UserMinus, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { Attendee } from "@/hooks/useAttendees";
 import { format } from "date-fns";
 import AttendeeListModal, { type AttendeeFilter } from "./AttendeeListModal";
