@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ["Space Grotesk", "sans-serif"],
+        body: ["DM Sans", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,20 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        sunset: {
+          orange: "hsl(var(--sunset-orange))",
+          gold: "hsl(var(--sunset-gold))",
+        },
+        indigo: {
+          deep: "hsl(var(--deep-indigo))",
+        },
+        earth: {
+          green: "hsl(var(--earth-green))",
+          brown: "hsl(var(--warm-brown))",
+        },
+        kente: {
+          red: "hsl(var(--kente-red))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +83,37 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "slide-in-right": {
+          "0%": { transform: "translateX(20px)", opacity: "0" },
+          "100%": { transform: "translateX(0)", opacity: "1" },
+        },
+        "pulse-warm": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(24 95% 53% / 0.4)" },
+          "50%": { boxShadow: "0 0 0 12px hsl(24 95% 53% / 0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-up": "fade-up 0.6s ease-out forwards",
+        "fade-in": "fade-in 0.5s ease-out forwards",
+        "slide-in-right": "slide-in-right 0.4s ease-out forwards",
+        "pulse-warm": "pulse-warm 2s infinite",
       },
     },
   },
