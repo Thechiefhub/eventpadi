@@ -339,6 +339,94 @@ export type Database = {
           },
         ]
       }
+      spark_narratives: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          event_name: string
+          generation_context: Json | null
+          id: string
+          narrative: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          event_name: string
+          generation_context?: Json | null
+          id?: string
+          narrative: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          event_name?: string
+          generation_context?: Json | null
+          id?: string
+          narrative?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spark_narratives_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spark_social_posts: {
+        Row: {
+          content: string
+          created_at: string
+          custom_instruction: string | null
+          event_id: string | null
+          event_name: string
+          id: string
+          platform: string
+          post_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          custom_instruction?: string | null
+          event_id?: string | null
+          event_name: string
+          id?: string
+          platform?: string
+          post_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          custom_instruction?: string | null
+          event_id?: string | null
+          event_name?: string
+          id?: string
+          platform?: string
+          post_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spark_social_posts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sponsor_contacts: {
         Row: {
           contacted_at: string | null
