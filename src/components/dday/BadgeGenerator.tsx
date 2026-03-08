@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Download, Printer } from "lucide-react";
+import { Printer, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,12 @@ import type { Attendee } from "@/hooks/useAttendees";
 interface Props {
   attendees: Attendee[];
   eventName: string;
+  onGenerateMissingIds?: () => Promise<void>;
 }
 
-export default function BadgeGenerator({ attendees, eventName }: Props) {
+export default function BadgeGenerator({ attendees, eventName, onGenerateMissingIds }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
+  const missingCount = attendees.filter((a) => !a.ticket_id).length;
 
   const handlePrint = () => {
     if (!printRef.current) return;
