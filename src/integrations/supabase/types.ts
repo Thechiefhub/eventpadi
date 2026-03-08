@@ -169,10 +169,12 @@ export type Database = {
           created_at: string
           event_id: string
           id: string
+          invitation_token: string | null
           invited_by: string
           invited_email: string
           role: string
           status: string
+          token_expires_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -180,10 +182,12 @@ export type Database = {
           created_at?: string
           event_id: string
           id?: string
+          invitation_token?: string | null
           invited_by: string
           invited_email: string
           role?: string
           status?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -191,10 +195,12 @@ export type Database = {
           created_at?: string
           event_id?: string
           id?: string
+          invitation_token?: string | null
           invited_by?: string
           invited_email?: string
           role?: string
           status?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string | null
         }

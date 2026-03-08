@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +13,8 @@ import { Mail, ArrowLeft } from "lucide-react";
 
 export default function Auth() {
   const { user, loading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +29,7 @@ export default function Auth() {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={returnTo || "/dashboard"} replace />;
   }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
