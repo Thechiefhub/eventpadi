@@ -33,9 +33,17 @@ const defaultTasks = [
   { title: "Recruit and brief volunteers", category: "Volunteers" },
   { title: "Plan for traffic/transport logistics", category: "Logistics" },
   { title: "Arrange catering with local vendors", category: "Logistics" },
+  { title: "Upload attendee list to D-Day module", category: "D-Day" },
+  { title: "Print attendee badges with QR codes", category: "D-Day" },
+  { title: "Set up check-in desk and signage", category: "D-Day" },
+  { title: "Test QR scanner on check-in devices", category: "D-Day" },
+  { title: "Brief check-in staff on D-Day module", category: "D-Day" },
+  { title: "Invite team members to D-Day check-in", category: "D-Day" },
+  { title: "Prepare offline check-in backup plan", category: "D-Day" },
+  { title: "Do a dry run of the check-in flow", category: "D-Day" },
 ];
 
-const categories = ["All", "Venue", "Logistics", "Speakers", "Marketing", "Volunteers", "General"];
+const categories = ["All", "Venue", "Logistics", "Speakers", "Marketing", "Volunteers", "D-Day", "General"];
 
 export default function EngineModule() {
   const { user } = useAuth();
