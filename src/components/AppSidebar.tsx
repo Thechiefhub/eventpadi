@@ -1,4 +1,4 @@
-import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck } from "lucide-react";
+import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck, Star } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ const moduleItems = [
   { title: "The Buzz", url: "/dashboard/buzz", icon: Megaphone },
   { title: "The Engine", url: "/dashboard/engine", icon: Settings },
   { title: "The D‑Day", url: "/dashboard/dday", icon: CalendarCheck },
+  { title: "Shortlist", url: "/dashboard/shortlist", icon: Star },
 ];
 
 export function AppSidebar() {
