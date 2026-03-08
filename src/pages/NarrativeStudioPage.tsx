@@ -67,13 +67,6 @@ export default function NarrativeStudioPage() {
   const { selectedEventId } = useEventSelect();
   const state = location.state as LocationState | undefined;
 
-  // Redirect if no state
-  useEffect(() => {
-    if (!state?.eventName) {
-      navigate("/dashboard/spark", { replace: true });
-    }
-  }, [state, navigate]);
-
   // Narrative state
   const [narrative, setNarrative] = useState("");
   const [narrativeLoading, setNarrativeLoading] = useState(false);
@@ -97,9 +90,20 @@ export default function NarrativeStudioPage() {
   const [savingNarrative, setSavingNarrative] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
 
-  if (!state?.eventName) return null;
+  // Redirect if no state
+  useEffect(() => {
+    if (!state?.eventName) {
+      navigate("/dashboard/spark", { replace: true });
+    }
+  }, [state, navigate]);
 
-  const { eventName, tagline, rationale, category, context } = state;
+  const eventName = state?.eventName || "";
+  const tagline = state?.tagline || "";
+  const rationale = state?.rationale || "";
+  const category = state?.category || "";
+  const context = state?.context;
+
+  if (!state?.eventName) return null;
 
   // Generate narrative on mount
   useEffect(() => {
