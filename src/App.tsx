@@ -16,6 +16,7 @@ import BuzzModule from "./pages/BuzzModule";
 import EngineModule from "./pages/EngineModule";
 import DDayModule from "./pages/DDayModule";
 import ShortlistPage from "./pages/ShortlistPage";
+import NarrativeStudioPage from "./pages/NarrativeStudioPage";
 import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="engine" element={<EngineModule />} />
               <Route path="dday" element={<DDayModule />} />
               <Route path="shortlist" element={<ShortlistPage />} />
+              <Route path="spark/studio" element={<NarrativeStudioPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

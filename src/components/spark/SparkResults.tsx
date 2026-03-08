@@ -4,8 +4,8 @@
  */
 
 import { useState } from "react";
-import { Star, Heart, Copy, Check, Download, RotateCcw, ExternalLink } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Star, Heart, Copy, Check, Download, RotateCcw, ExternalLink, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ interface Props {
   onGenerateThemes: () => void;
   onReset: () => void;
   themesLoading: boolean;
+  context?: any;
 }
 
 export default function SparkResults({
@@ -41,8 +42,10 @@ export default function SparkResults({
   onGenerateThemes,
   onReset,
   themesLoading,
+  context,
 }: Props) {
   const [copiedName, setCopiedName] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const copyName = (name: string) => {
     navigator.clipboard.writeText(name);
@@ -176,6 +179,24 @@ export default function SparkResults({
                             <Copy className="h-3.5 w-3.5" />
                           )}
                           Copy
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-xs text-primary"
+                          onClick={() =>
+                            navigate("/dashboard/spark/studio", {
+                              state: {
+                                eventName: n.name,
+                                tagline: n.tagline,
+                                rationale: n.rationale,
+                                category: cat.category,
+                                context,
+                              },
+                            })
+                          }
+                        >
+                          <Sparkles className="h-3.5 w-3.5" /> Explore
                         </Button>
                       </div>
                     </CardContent>
