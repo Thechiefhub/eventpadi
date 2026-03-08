@@ -1,18 +1,30 @@
+import { useState } from "react";
 import { Users, UserCheck, UserMinus, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { Attendee } from "@/hooks/useAttendees";
 import { format } from "date-fns";
+import AttendeeListModal, { type AttendeeFilter } from "./AttendeeListModal";
 
 interface Props {
   attendees: Attendee[];
 }
 
 export default function DDayDashboard({ attendees }: Props) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalFilter, setModalFilter] = useState<AttendeeFilter>("all");
+  const [modalTitle, setModalTitle] = useState("");
+
   const total = attendees.length;
   const checkedIn = attendees.filter((a) => a.checked_in).length;
   const remaining = total - checkedIn;
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+  const openModal = (filter: AttendeeFilter, title: string) => {
+    setModalFilter(filter);
+    setModalTitle(title);
+    setModalOpen(true);
+  };
 
   const recentCheckins = attendees
     .filter((a) => a.checked_in && a.checked_in_at)
@@ -20,10 +32,10 @@ export default function DDayDashboard({ attendees }: Props) {
     .slice(0, 10);
 
   const stats = [
-    { label: "Registered", value: total, icon: Users, color: "text-primary" },
-    { label: "Checked In", value: checkedIn, icon: UserCheck, color: "text-[hsl(var(--earth-green))]" },
-    { label: "Remaining", value: remaining, icon: UserMinus, color: "text-[hsl(var(--kente-red))]" },
-    { label: "Check-in %", value: `${pct}%`, icon: Clock, color: "text-[hsl(var(--sunset-gold))]" },
+    { label: "Registered", value: total, icon: Users, color: "text-primary", filter: "all" as AttendeeFilter },
+    { label: "Checked In", value: checkedIn, icon: UserCheck, color: "text-[hsl(var(--earth-green))]", filter: "checked_in" as AttendeeFilter },
+    { label: "Remaining", value: remaining, icon: UserMinus, color: "text-[hsl(var(--kente-red))]", filter: "remaining" as AttendeeFilter },
+    { label: "Check-in %", value: `${pct}%`, icon: Clock, color: "text-[hsl(var(--sunset-gold))]", filter: null },
   ];
 
   return (
@@ -31,7 +43,13 @@ export default function DDayDashboard({ attendees }: Props) {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {stats.map((s) => (
-          <Card key={s.label} className="border-border">
+          <Card
+            key={s.label}
+            className={`border-border transition-all ${
+              s.filter ? "cursor-pointer hover:shadow-md hover:border-primary/30 active:scale-[0.98]" : ""
+            }`}
+            onClick={() => s.filter && openModal(s.filter, `${s.label} Attendees`)}
+          >
             <CardContent className="p-4 flex flex-col items-center text-center gap-1">
               <s.icon className={`h-6 w-6 ${s.color}`} />
               <span className="text-2xl md:text-3xl font-display font-bold text-foreground">{s.value}</span>
@@ -82,6 +100,15 @@ export default function DDayDashboard({ attendees }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Attendee List Modal */}
+      <AttendeeListModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        attendees={attendees}
+        filter={modalFilter}
+        title={modalTitle}
+      />
     </div>
   );
 }
