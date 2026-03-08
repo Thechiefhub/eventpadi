@@ -9,9 +9,10 @@ import AttendeeListModal, { type AttendeeFilter } from "./AttendeeListModal";
 
 interface Props {
   attendees: Attendee[];
+  isAdmin?: boolean;
 }
 
-export default function DDayDashboard({ attendees }: Props) {
+export default function DDayDashboard({ attendees, isAdmin = false }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalFilter, setModalFilter] = useState<AttendeeFilter>("all");
   const [modalTitle, setModalTitle] = useState("");

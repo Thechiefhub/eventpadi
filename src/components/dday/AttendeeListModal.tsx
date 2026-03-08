@@ -49,6 +49,7 @@ interface Props {
   attendees: Attendee[];
   filter: AttendeeFilter;
   title: string;
+  isAdmin?: boolean;
 }
 
 type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at";
@@ -56,7 +57,7 @@ type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
 
-export default function AttendeeListModal({ open, onOpenChange, attendees, filter, title }: Props) {
+export default function AttendeeListModal({ open, onOpenChange, attendees, filter, title, isAdmin = false }: Props) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -184,9 +185,11 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {sorted.length} result{sorted.length !== 1 ? "s" : ""}
             </span>
-            <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
-              <Download className="h-3.5 w-3.5" /> CSV
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+                <Download className="h-3.5 w-3.5" /> CSV
+              </Button>
+            )}
           </div>
         </div>
 
