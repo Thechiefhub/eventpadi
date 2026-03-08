@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Download, Printer } from "lucide-react";
+import { Printer, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,12 @@ import type { Attendee } from "@/hooks/useAttendees";
 interface Props {
   attendees: Attendee[];
   eventName: string;
+  onGenerateMissingIds?: () => Promise<void>;
 }
 
-export default function BadgeGenerator({ attendees, eventName }: Props) {
+export default function BadgeGenerator({ attendees, eventName, onGenerateMissingIds }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
+  const missingCount = attendees.filter((a) => !a.ticket_id).length;
 
   const handlePrint = () => {
     if (!printRef.current) return;
@@ -52,11 +54,23 @@ export default function BadgeGenerator({ attendees, eventName }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{attendees.length} badge(s) ready</p>
-        <Button onClick={handlePrint} className="gradient-sunset text-primary-foreground">
-          <Printer className="h-4 w-4 mr-1" /> Print All Badges
-        </Button>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div>
+          <p className="text-sm text-muted-foreground">{attendees.length} badge(s) ready</p>
+          {missingCount > 0 && (
+            <p className="text-xs text-[hsl(var(--kente-red))]">{missingCount} attendee(s) missing ticket IDs</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {missingCount > 0 && onGenerateMissingIds && (
+            <Button variant="outline" size="sm" onClick={onGenerateMissingIds}>
+              <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
+            </Button>
+          )}
+          <Button onClick={handlePrint} className="gradient-sunset text-primary-foreground">
+            <Printer className="h-4 w-4 mr-1" /> Print All Badges
+          </Button>
+        </div>
       </div>
 
       {/* Visible preview (first 6) */}
