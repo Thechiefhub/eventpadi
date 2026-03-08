@@ -1,167 +1,234 @@
-import { useState } from "react";
-import { Sparkles, Wand2, Palette, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+/**
+ * The Spark Module — Advanced AI Event Naming Engine
+ *
+ * Multi-step form → AI-generated categorized names → Shortlist → Theme generation
+ * With offline caching, mobile responsiveness, and save-to-database.
+ */
+
+import { useState, useEffect, useCallback } from "react";
+import { Sparkles, Palette, WifiOff, Info } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEventSelect } from "@/hooks/useEventSelect";
 import { toast } from "sonner";
+import SparkForm, { type SparkContext } from "@/components/spark/SparkForm";
+import SparkResults, { type NameCategory, type NameSuggestion } from "@/components/spark/SparkResults";
+import SparkThemes, { type ThemePackage } from "@/components/spark/SparkThemes";
 
-const vibes = ["Innovative", "Community", "Premium", "Bold", "Cultural", "Tech-Forward"];
-
-interface BrandingResult {
-  names: string[];
-  taglines: string[];
-  theme_statement: string;
-}
+const CACHE_KEY = "spark_last_generation";
 
 export default function SparkModule() {
-  const [topic, setTopic] = useState("");
-  const [audience, setAudience] = useState("");
-  const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
+  const { user } = useAuth();
+  const { events, selectedEventId } = useEventSelect();
+
+  // State
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<BrandingResult | null>(null);
+  const [themesLoading, setThemesLoading] = useState(false);
+  const [categories, setCategories] = useState<NameCategory[]>([]);
+  const [themes, setThemes] = useState<ThemePackage[]>([]);
+  const [shortlisted, setShortlisted] = useState<Set<string>>(new Set());
+  const [shortlistDetails, setShortlistDetails] = useState<Map<string, { suggestion: NameSuggestion; category: string }>>(new Map());
+  const [lastContext, setLastContext] = useState<SparkContext | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  const toggleVibe = (v: string) => {
-    setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
-  };
+  // Offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
-  const handleGenerate = async () => {
-    if (!topic.trim()) {
-      toast.error("Please enter an event topic");
+  // Load cached results on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { categories: c, context: ctx } = JSON.parse(cached);
+        if (c?.length) {
+          setCategories(c);
+          setLastContext(ctx);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Generate names
+  const handleGenerate = useCallback(async (context: SparkContext) => {
+    if (isOffline) {
+      toast.error("You're offline. Showing cached results if available.");
       return;
     }
+
     setLoading(true);
-    setResult(null);
+    setCategories([]);
+    setThemes([]);
+    setShortlisted(new Set());
+    setShortlistDetails(new Map());
+    setLastContext(context);
 
     try {
       const { data, error } = await supabase.functions.invoke("spark-generate", {
-        body: { topic, audience, vibes: selectedVibes },
+        body: { mode: "names", context },
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      setResult(data);
+      const cats: NameCategory[] = data.categories || [];
+      setCategories(cats);
+
+      // Cache for offline
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ categories: cats, context }));
+      } catch {}
+
+      toast.success(`Generated ${cats.reduce((s, c) => s + c.names.length, 0)} name suggestions!`);
     } catch (e: any) {
-      toast.error(e.message || "Failed to generate. Please try again.");
+      toast.error(e.message || "Failed to generate names. Please try again.");
     } finally {
       setLoading(false);
     }
+  }, [isOffline]);
+
+  // Toggle shortlist
+  const toggleShortlist = useCallback(async (suggestion: NameSuggestion, category: string) => {
+    const name = suggestion.name;
+    const newSet = new Set(shortlisted);
+    const newDetails = new Map(shortlistDetails);
+
+    if (newSet.has(name)) {
+      newSet.delete(name);
+      newDetails.delete(name);
+      // Remove from DB
+      if (user) {
+        await supabase.from("shortlisted_names").delete()
+          .eq("user_id", user.id).eq("name", name);
+      }
+      toast.info(`Removed "${name}" from shortlist`);
+    } else {
+      newSet.add(name);
+      newDetails.set(name, { suggestion, category });
+      // Save to DB
+      if (user) {
+        await supabase.from("shortlisted_names").insert({
+          user_id: user.id,
+          event_id: selectedEventId || null,
+          name: suggestion.name,
+          category,
+          rationale: suggestion.rationale,
+          tagline: suggestion.tagline,
+          rating: suggestion.rating,
+          generation_context: lastContext as any,
+        });
+      }
+      toast.success(`"${name}" added to shortlist`);
+    }
+
+    setShortlisted(newSet);
+    setShortlistDetails(newDetails);
+  }, [shortlisted, shortlistDetails, user, selectedEventId, lastContext]);
+
+  // Generate themes for shortlisted names
+  const handleGenerateThemes = useCallback(async () => {
+    if (shortlisted.size === 0) return;
+    if (isOffline) {
+      toast.error("You're offline. Please reconnect to generate themes.");
+      return;
+    }
+
+    setThemesLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spark-generate", {
+        body: {
+          mode: "theme",
+          context: lastContext,
+          selectedNames: Array.from(shortlisted),
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setThemes(data.themes || []);
+      toast.success("Theme frameworks generated!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate themes.");
+    } finally {
+      setThemesLoading(false);
+    }
+  }, [shortlisted, lastContext, isOffline]);
+
+  const handleReset = () => {
+    setCategories([]);
+    setThemes([]);
+    setShortlisted(new Set());
+    setShortlistDetails(new Map());
+    setLastContext(null);
   };
 
+  const showResults = categories.length > 0;
+
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-5xl">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-sunset-gold" /> The Spark
+          <Sparkles className="h-7 w-7 text-[hsl(var(--sunset-gold))]" /> The Spark
         </h1>
-        <p className="text-muted-foreground mt-1">Generate your event's name, theme & visual identity with AI.</p>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          AI-powered event naming engine with deep African cultural context.
+        </p>
       </div>
 
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="flex items-center gap-2 text-sm text-[hsl(var(--kente-red))] bg-[hsl(var(--kente-red))/0.1] rounded-lg px-4 py-2">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          <span>You're offline. Showing cached results. New generations require an internet connection.</span>
+        </div>
+      )}
+
+      {/* Main Content */}
       <Tabs defaultValue="name" className="w-full">
         <TabsList className="bg-muted">
-          <TabsTrigger value="name">Name & Theme</TabsTrigger>
+          <TabsTrigger value="name">Name Generator</TabsTrigger>
           <TabsTrigger value="visual">Visual Identity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="name" className="mt-6 space-y-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-primary" /> AI Name Generator
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Event Topic</Label>
-                  <Input placeholder="e.g. Women in Tech" value={topic} onChange={(e) => setTopic(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <Input placeholder="e.g. Young entrepreneurs" value={audience} onChange={(e) => setAudience(e.target.value)} />
-                </div>
+          {!showResults ? (
+            <>
+              {/* Privacy Notice */}
+              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Your inputs are sent to our AI for name generation only. We optionally track which names you choose to improve future suggestions. You can opt out anytime.
+                </span>
               </div>
-              <div className="space-y-2">
-                <Label>Desired Vibe</Label>
-                <div className="flex flex-wrap gap-2">
-                  {vibes.map((v) => (
-                    <Badge
-                      key={v}
-                      variant={selectedVibes.includes(v) ? "default" : "outline"}
-                      className={`cursor-pointer transition-all ${selectedVibes.includes(v) ? "gradient-sunset text-primary-foreground border-transparent" : ""}`}
-                      onClick={() => toggleVibe(v)}
-                    >
-                      {v}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <Button variant="hero" onClick={handleGenerate} className="mt-2" disabled={loading}>
-                {loading ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...</>
-                ) : (
-                  <><Sparkles className="h-4 w-4 mr-1" /> Generate Names & Themes</>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {result && (
-            <div className="space-y-6 animate-fade-up">
-              <Card className="border-border">
-                <CardHeader>
-                  <CardTitle className="font-display text-lg">Suggested Names</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {result.names.map((name) => (
-                      <button
-                        key={name}
-                        className="text-left rounded-lg border border-border p-3 hover:border-primary hover:shadow-warm transition-all text-foreground font-display font-medium"
-                        onClick={() => {
-                          navigator.clipboard.writeText(name);
-                          toast.success(`"${name}" copied!`);
-                        }}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border">
-                <CardHeader>
-                  <CardTitle className="font-display text-lg">Taglines</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {result.taglines.map((t) => (
-                    <p
-                      key={t}
-                      className="text-muted-foreground border-l-2 border-primary pl-3 py-1 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => {
-                        navigator.clipboard.writeText(t);
-                        toast.success("Tagline copied!");
-                      }}
-                    >
-                      {t}
-                    </p>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-border">
-                <CardHeader>
-                  <CardTitle className="font-display text-lg">Theme Statement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-foreground leading-relaxed">{result.theme_statement}</p>
-                </CardContent>
-              </Card>
+              <SparkForm onSubmit={handleGenerate} loading={loading} />
+            </>
+          ) : (
+            <div className="space-y-6">
+              <SparkResults
+                categories={categories}
+                shortlisted={shortlisted}
+                onToggleShortlist={toggleShortlist}
+                onGenerateThemes={handleGenerateThemes}
+                onReset={handleReset}
+                themesLoading={themesLoading}
+              />
+              {themes.length > 0 && <SparkThemes themes={themes} />}
             </div>
           )}
         </TabsContent>
