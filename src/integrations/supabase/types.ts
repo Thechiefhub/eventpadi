@@ -477,6 +477,51 @@ export type Database = {
           },
         ]
       }
+      sponsors: {
+        Row: {
+          added_by: string | null
+          contact_info: string | null
+          country: string
+          created_at: string
+          id: string
+          industry: string
+          is_custom: boolean | null
+          logo_url: string | null
+          name: string
+          past_sponsorships: string | null
+          sponsor_type: string | null
+          website: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          contact_info?: string | null
+          country: string
+          created_at?: string
+          id?: string
+          industry: string
+          is_custom?: boolean | null
+          logo_url?: string | null
+          name: string
+          past_sponsorships?: string | null
+          sponsor_type?: string | null
+          website?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          contact_info?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          industry?: string
+          is_custom?: boolean | null
+          logo_url?: string | null
+          name?: string
+          past_sponsorships?: string | null
+          sponsor_type?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
