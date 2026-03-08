@@ -350,6 +350,36 @@ export default function ChaseModule() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {contact.pitch_letter && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={() => {
+                                  const lines = contact.pitch_letter!.split("\n\n");
+                                  const subject = encodeURIComponent(lines[0]?.replace("Subject: ", "") || contact.sponsor_name);
+                                  const body = encodeURIComponent(lines.slice(1).join("\n\n"));
+                                  window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+                                }}
+                                title="Send via Email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-earth-green"
+                                onClick={() => {
+                                  const text = encodeURIComponent(contact.pitch_letter!);
+                                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                                }}
+                                title="Send via WhatsApp"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                           <Select value={contact.status || "draft"} onValueChange={(v) => updateContactStatus(contact.id, v)}>
                             <SelectTrigger className={`w-32 text-xs capitalize ${statusColors[contact.status || "draft"]}`}>
                               <SelectValue />
