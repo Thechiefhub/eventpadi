@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.spark-visual]
 verify_jwt = false
+
+[functions.spark-studio]
+verify_jwt = false
