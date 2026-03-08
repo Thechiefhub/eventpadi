@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Handshake, Search, FileText, Building2, Globe, Mail, ExternalLink, Loader2, Copy, CheckCircle2, Clock, Send, Trash2 } from "lucide-react";
+import { Handshake, Search, FileText, Building2, Globe, Mail, ExternalLink, Loader2, Copy, CheckCircle2, Clock, Send, Trash2, MessageCircle, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -350,6 +350,36 @@ export default function ChaseModule() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {contact.pitch_letter && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={() => {
+                                  const lines = contact.pitch_letter!.split("\n\n");
+                                  const subject = encodeURIComponent(lines[0]?.replace("Subject: ", "") || contact.sponsor_name);
+                                  const body = encodeURIComponent(lines.slice(1).join("\n\n"));
+                                  window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+                                }}
+                                title="Send via Email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-earth-green"
+                                onClick={() => {
+                                  const text = encodeURIComponent(contact.pitch_letter!);
+                                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                                }}
+                                title="Send via WhatsApp"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                           <Select value={contact.status || "draft"} onValueChange={(v) => updateContactStatus(contact.id, v)}>
                             <SelectTrigger className={`w-32 text-xs capitalize ${statusColors[contact.status || "draft"]}`}>
                               <SelectValue />
@@ -481,6 +511,36 @@ export default function ChaseModule() {
                 <Label className="text-xs text-muted-foreground">Suggested Follow-up (5 days later)</Label>
                 <div className="rounded-lg border border-border p-3 bg-muted/50 text-sm text-muted-foreground italic">
                   {pitch.follow_up_suggestion}
+                </div>
+              </div>
+
+              {/* Share buttons */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Share Pitch</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      const subject = encodeURIComponent(pitch.subject_line);
+                      const body = encodeURIComponent(pitch.letter);
+                      window.open(`mailto:${selectedSponsor?.contact || ""}?subject=${subject}&body=${body}`, "_blank");
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-1" /> Email
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      const text = encodeURIComponent(`${pitch.subject_line}\n\n${pitch.letter}`);
+                      window.open(`https://wa.me/?text=${text}`, "_blank");
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
+                  </Button>
                 </div>
               </div>
 
