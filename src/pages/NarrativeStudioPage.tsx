@@ -103,14 +103,14 @@ export default function NarrativeStudioPage() {
   const category = state?.category || "";
   const context = state?.context;
 
-  if (!state?.eventName) return null;
-
   // Generate narrative on mount
   useEffect(() => {
     if (eventName && !narrative) {
       generateNarrative();
     }
   }, [eventName]);
+
+  if (!state?.eventName) return null;
 
   const generateNarrative = async () => {
     setNarrativeLoading(true);
