@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { Sparkles, Palette, Download, Trash2, Loader2, Image as ImageIcon } from "lucide-react";
+import { Sparkles, Palette, Download, Trash2, Loader2, Image as ImageIcon, Pencil, X, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,9 @@ export default function VisualIdentityStudio() {
   const [selectedMood, setSelectedMood] = useState(COLOR_MOODS[0].value);
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   const handleGenerate = async () => {
     if (!description.trim()) {
@@ -98,6 +101,36 @@ export default function VisualIdentityStudio() {
       toast.info("Visual removed.");
     } catch {
       toast.error("Failed to delete image.");
+    }
+  };
+
+  const handleRefine = async (index: number) => {
+    if (!editPrompt.trim()) return;
+    const img = images[index];
+    if (!img) return;
+
+    setEditLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("spark-visual", {
+        body: {
+          mode: "edit",
+          sourceUrl: img.url,
+          editInstruction: editPrompt,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      const newImage = data.image as GeneratedImage;
+      setImages((prev) => prev.map((im, i) => (i === index ? newImage : im)));
+      setEditingIndex(null);
+      setEditPrompt("");
+      toast.success("Image refined successfully!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to refine image.");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -213,31 +246,91 @@ export default function VisualIdentityStudio() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {images.map((img, i) => (
-                <div key={i} className="group relative rounded-lg overflow-hidden border border-border bg-card">
+                <div key={`${img.path}-${i}`} className="group relative rounded-lg overflow-hidden border border-border bg-card">
                   <img
                     src={img.url}
                     alt={`Event visual concept ${i + 1}`}
                     className="w-full aspect-[3/4] object-cover"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-colors flex items-end justify-center pb-3 gap-2 opacity-0 group-hover:opacity-100">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleDownload(img.url, i)}
-                      className="text-xs"
-                    >
-                      <Download className="h-3.5 w-3.5 mr-1" /> Download
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(img, i)}
-                      className="text-xs"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                    </Button>
-                  </div>
+                  {/* Hover overlay with actions */}
+                  {editingIndex !== i && (
+                    <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-colors flex items-end justify-center pb-3 gap-2 opacity-0 group-hover:opacity-100">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => { setEditingIndex(i); setEditPrompt(""); }}
+                        className="text-xs"
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Refine
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleDownload(img.url, i)}
+                        className="text-xs"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" /> Download
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDelete(img, i)}
+                        className="text-xs"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                  {/* Edit prompt overlay */}
+                  {editingIndex === i && (
+                    <div className="absolute inset-0 bg-foreground/60 flex flex-col items-center justify-end p-3 gap-2">
+                      <div className="w-full space-y-2">
+                        <div className="flex gap-1">
+                          <Input
+                            value={editPrompt}
+                            onChange={(e) => setEditPrompt(e.target.value)}
+                            placeholder="e.g. Make it darker, add gold accents…"
+                            className="bg-background/90 text-foreground text-xs h-8"
+                            disabled={editLoading}
+                            onKeyDown={(e) => e.key === "Enter" && handleRefine(i)}
+                            autoFocus
+                          />
+                          <Button
+                            size="sm"
+                            variant="hero"
+                            className="h-8 px-2.5"
+                            onClick={() => handleRefine(i)}
+                            disabled={editLoading || !editPrompt.trim()}
+                          >
+                            {editLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-primary-foreground hover:bg-foreground/20"
+                            onClick={() => { setEditingIndex(null); setEditPrompt(""); }}
+                            disabled={editLoading}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {["Make it darker", "Add gold accents", "More vibrant colors", "Simplify layout"].map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              className="text-[10px] bg-background/70 text-foreground rounded px-2 py-0.5 hover:bg-background/90 transition-colors"
+                              onClick={() => setEditPrompt(s)}
+                              disabled={editLoading}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
