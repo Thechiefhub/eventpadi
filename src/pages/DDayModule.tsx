@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEventSelect } from "@/hooks/useEventSelect";
 import { useAttendees } from "@/hooks/useAttendees";
+import { useAuth } from "@/contexts/AuthContext";
 import DDayDashboard from "@/components/dday/DDayDashboard";
 import CheckInInterface from "@/components/dday/CheckInInterface";
 import AttendeeUpload from "@/components/dday/AttendeeUpload";
@@ -27,8 +28,12 @@ import TeamManager from "@/components/dday/TeamManager";
 import BadgeGenerator from "@/components/dday/BadgeGenerator";
 
 export default function DDayModule() {
+  const { user } = useAuth();
   const { events, selectedEventId, setSelectedEventId, loading: eventsLoading } = useEventSelect();
   const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId);
+
+  // Event owner is always admin; could extend with team role check in the future
+  const isAdmin = !!user && events.some((e) => e.id === selectedEventId);
 
   if (eventsLoading) {
     return (
@@ -94,7 +99,7 @@ export default function DDayModule() {
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-4">
-          <DDayDashboard attendees={attendees} />
+          <DDayDashboard attendees={attendees} isAdmin={isAdmin} />
         </TabsContent>
 
         <TabsContent value="checkin" className="mt-4">
