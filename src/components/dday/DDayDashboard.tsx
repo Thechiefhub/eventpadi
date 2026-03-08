@@ -91,7 +91,51 @@ export default function DDayDashboard({ attendees }: Props) {
         </CardContent>
       </Card>
 
-      {/* Recent Check-ins Feed */}
+      {/* Check-in Rate Over Time Chart */}
+      {chartData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-display">Check-in Rate Over Time</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="checkinGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="time" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      borderColor: "hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      fontSize: 12,
+                    }}
+                    formatter={(value: number, name: string) =>
+                      name === "count" ? [`${value} attendees`, "Checked In"] : [`${value}%`, "Rate"]
+                    }
+                    labelFormatter={(label) => `Time: ${label}`}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    fill="url(#checkinGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-display">Recent Check-ins</CardTitle>
