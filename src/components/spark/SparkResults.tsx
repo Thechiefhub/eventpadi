@@ -180,6 +180,24 @@ export default function SparkResults({
                           )}
                           Copy
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-xs text-primary"
+                          onClick={() =>
+                            navigate("/dashboard/spark/studio", {
+                              state: {
+                                eventName: n.name,
+                                tagline: n.tagline,
+                                rationale: n.rationale,
+                                category: cat.category,
+                                context,
+                              },
+                            })
+                          }
+                        >
+                          <Sparkles className="h-3.5 w-3.5" /> Explore
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

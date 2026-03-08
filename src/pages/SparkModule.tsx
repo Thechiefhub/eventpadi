@@ -223,6 +223,7 @@ export default function SparkModule() {
                 onGenerateThemes={handleGenerateThemes}
                 onReset={handleReset}
                 themesLoading={themesLoading}
+                context={lastContext}
               />
               {themes.length > 0 && <SparkThemes themes={themes} />}
             </div>
