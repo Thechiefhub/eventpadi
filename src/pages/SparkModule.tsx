@@ -1,40 +1,55 @@
 import { useState } from "react";
-import { Sparkles, Wand2, Palette, Download } from "lucide-react";
+import { Sparkles, Wand2, Palette, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const sampleNames = [
-  "AfriSpark Summit", "Ubuntu Connect", "Innovate Nairobi",
-  "The Baobab Forum", "Savanna Tech Fest", "Nkosi Innovation Days",
-  "Wakanda Builders", "Kente Code Con", "Sahel Futures", "Jamii Converge",
-];
-
-const sampleTaglines = [
-  "Where African innovation meets global impact.",
-  "Building tomorrow, rooted in today.",
-  "Code. Culture. Community.",
-  "The future is being built here.",
-  "Connecting visionaries across the continent.",
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const vibes = ["Innovative", "Community", "Premium", "Bold", "Cultural", "Tech-Forward"];
+
+interface BrandingResult {
+  names: string[];
+  taglines: string[];
+  theme_statement: string;
+}
 
 export default function SparkModule() {
   const [topic, setTopic] = useState("");
   const [audience, setAudience] = useState("");
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
-  const [generated, setGenerated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<BrandingResult | null>(null);
 
   const toggleVibe = (v: string) => {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
   };
 
-  const handleGenerate = () => {
-    setGenerated(true);
+  const handleGenerate = async () => {
+    if (!topic.trim()) {
+      toast.error("Please enter an event topic");
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("spark-generate", {
+        body: { topic, audience, vibes: selectedVibes },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setResult(data);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -85,13 +100,17 @@ export default function SparkModule() {
                   ))}
                 </div>
               </div>
-              <Button variant="hero" onClick={handleGenerate} className="mt-2">
-                <Sparkles className="h-4 w-4 mr-1" /> Generate Names & Themes
+              <Button variant="hero" onClick={handleGenerate} className="mt-2" disabled={loading}>
+                {loading ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-1" /> Generate Names & Themes</>
+                )}
               </Button>
             </CardContent>
           </Card>
 
-          {generated && (
+          {result && (
             <div className="space-y-6 animate-fade-up">
               <Card className="border-border">
                 <CardHeader>
@@ -99,10 +118,14 @@ export default function SparkModule() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-2 md:grid-cols-2">
-                    {sampleNames.map((name) => (
+                    {result.names.map((name) => (
                       <button
                         key={name}
                         className="text-left rounded-lg border border-border p-3 hover:border-primary hover:shadow-warm transition-all text-foreground font-display font-medium"
+                        onClick={() => {
+                          navigator.clipboard.writeText(name);
+                          toast.success(`"${name}" copied!`);
+                        }}
                       >
                         {name}
                       </button>
@@ -116,8 +139,17 @@ export default function SparkModule() {
                   <CardTitle className="font-display text-lg">Taglines</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {sampleTaglines.map((t) => (
-                    <p key={t} className="text-muted-foreground border-l-2 border-primary pl-3 py-1">{t}</p>
+                  {result.taglines.map((t) => (
+                    <p
+                      key={t}
+                      className="text-muted-foreground border-l-2 border-primary pl-3 py-1 cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => {
+                        navigator.clipboard.writeText(t);
+                        toast.success("Tagline copied!");
+                      }}
+                    >
+                      {t}
+                    </p>
                   ))}
                 </CardContent>
               </Card>
@@ -127,11 +159,7 @@ export default function SparkModule() {
                   <CardTitle className="font-display text-lg">Theme Statement</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-foreground leading-relaxed">
-                    <strong>AfriSpark Summit</strong> is a two-day gathering that brings together Africa's boldest
-                    innovators to share ideas, forge partnerships, and build solutions that transform communities.
-                    Rooted in the spirit of Ubuntu, we believe that technology thrives when it serves everyone.
-                  </p>
+                  <p className="text-foreground leading-relaxed">{result.theme_statement}</p>
                 </CardContent>
               </Card>
             </div>
