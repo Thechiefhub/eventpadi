@@ -1,53 +1,122 @@
-import { useState } from "react";
-import { Settings, CheckCircle2, Circle, Clock, AlertTriangle, Zap, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Clock, FileText, Plus, Loader2, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-interface Task {
+interface ChecklistItem {
   id: string;
-  text: string;
+  title: string;
   category: string;
-  done: boolean;
-  dueIn: string;
-  priority: "high" | "medium" | "low";
+  is_completed: boolean;
+  due_date: string | null;
+  event_id: string;
 }
 
-const initialTasks: Task[] = [
-  { id: "1", text: "Book venue and confirm availability", category: "Venue", done: true, dueIn: "Done", priority: "high" },
-  { id: "2", text: "Book backup generator for venue", category: "Logistics", done: true, dueIn: "Done", priority: "high" },
-  { id: "3", text: "Confirm PA system and microphone availability", category: "Logistics", done: true, dueIn: "Done", priority: "high" },
-  { id: "4", text: "Arrange security (>100 attendees)", category: "Logistics", done: false, dueIn: "14 days", priority: "high" },
-  { id: "5", text: "Set up mobile money payments (M-Pesa/MoMo)", category: "Logistics", done: false, dueIn: "21 days", priority: "medium" },
-  { id: "6", text: "Send speaker invitation emails", category: "Speakers", done: false, dueIn: "7 days", priority: "high" },
-  { id: "7", text: "Collect speaker headshots and bios", category: "Speakers", done: false, dueIn: "30 days", priority: "medium" },
-  { id: "8", text: "Design and order event badges", category: "Marketing", done: false, dueIn: "21 days", priority: "medium" },
-  { id: "9", text: "Submit early bird ticket post", category: "Marketing", done: false, dueIn: "3 days", priority: "high" },
-  { id: "10", text: "Recruit and brief volunteers", category: "Volunteers", done: false, dueIn: "28 days", priority: "low" },
-  { id: "11", text: "Plan for traffic/transport logistics", category: "Logistics", done: false, dueIn: "14 days", priority: "medium" },
-  { id: "12", text: "Arrange catering with local vendors", category: "Logistics", done: false, dueIn: "21 days", priority: "medium" },
+const defaultTasks = [
+  { title: "Book venue and confirm availability", category: "Venue" },
+  { title: "Book backup generator for venue", category: "Logistics" },
+  { title: "Confirm PA system and microphone availability", category: "Logistics" },
+  { title: "Arrange security (>100 attendees)", category: "Logistics" },
+  { title: "Set up mobile money payments (M-Pesa/MoMo)", category: "Logistics" },
+  { title: "Send speaker invitation emails", category: "Speakers" },
+  { title: "Collect speaker headshots and bios", category: "Speakers" },
+  { title: "Design and order event badges", category: "Marketing" },
+  { title: "Submit early bird ticket post", category: "Marketing" },
+  { title: "Recruit and brief volunteers", category: "Volunteers" },
+  { title: "Plan for traffic/transport logistics", category: "Logistics" },
+  { title: "Arrange catering with local vendors", category: "Logistics" },
 ];
 
-const priorityColors: Record<string, string> = {
-  high: "bg-kente-red/15 text-kente-red border-kente-red/30",
-  medium: "bg-sunset-gold/15 text-sunset-gold border-sunset-gold/30",
-  low: "bg-earth-green/15 text-earth-green border-earth-green/30",
-};
-
-const categories = ["All", "Venue", "Logistics", "Speakers", "Marketing", "Volunteers"];
+const categories = ["All", "Venue", "Logistics", "Speakers", "Marketing", "Volunteers", "General"];
 
 export default function EngineModule() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const { user } = useAuth();
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [events, setEvents] = useState<{ id: string; name: string }[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<string>("");
   const [filter, setFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("General");
+  const [adding, setAdding] = useState(false);
 
-  const toggleTask = (id: string) => {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("events").select("id, name").order("created_at", { ascending: false }).then(({ data }) => {
+      const evts = data || [];
+      setEvents(evts);
+      if (evts.length > 0 && !selectedEvent) setSelectedEvent(evts[0].id);
+    });
+  }, [user]);
+
+  const fetchItems = async () => {
+    if (!selectedEvent) { setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("checklist_items")
+      .select("*")
+      .eq("event_id", selectedEvent)
+      .order("created_at");
+    if (error) toast.error(error.message);
+    setItems(data || []);
+    setLoading(false);
   };
 
-  const filtered = filter === "All" ? tasks : tasks.filter((t) => t.category === filter);
-  const doneCount = tasks.filter((t) => t.done).length;
-  const progress = Math.round((doneCount / tasks.length) * 100);
+  useEffect(() => { fetchItems(); }, [selectedEvent]);
+
+  const seedDefaults = async () => {
+    if (!user || !selectedEvent) return;
+    setAdding(true);
+    const rows = defaultTasks.map((t) => ({ ...t, event_id: selectedEvent, user_id: user.id }));
+    const { error } = await supabase.from("checklist_items").insert(rows);
+    if (error) toast.error(error.message);
+    else toast.success("Default checklist added!");
+    await fetchItems();
+    setAdding(false);
+  };
+
+  const toggleItem = async (item: ChecklistItem) => {
+    const newVal = !item.is_completed;
+    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_completed: newVal } : i));
+    const { error } = await supabase.from("checklist_items").update({ is_completed: newVal }).eq("id", item.id);
+    if (error) {
+      toast.error("Failed to update task");
+      setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_completed: !newVal } : i));
+    }
+  };
+
+  const addItem = async () => {
+    if (!newTitle.trim() || !user || !selectedEvent) return;
+    setAdding(true);
+    const { error } = await supabase.from("checklist_items").insert({
+      title: newTitle.trim(),
+      category: newCategory,
+      event_id: selectedEvent,
+      user_id: user.id,
+    });
+    if (error) toast.error(error.message);
+    else { setNewTitle(""); toast.success("Task added!"); }
+    await fetchItems();
+    setAdding(false);
+  };
+
+  const deleteItem = async (id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    const { error } = await supabase.from("checklist_items").delete().eq("id", id);
+    if (error) { toast.error("Failed to delete"); fetchItems(); }
+  };
+
+  const filtered = filter === "All" ? items : items.filter((t) => t.category === filter);
+  const doneCount = items.filter((t) => t.is_completed).length;
+  const progress = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-5xl">
@@ -58,56 +127,126 @@ export default function EngineModule() {
         <p className="text-muted-foreground mt-1">Your master checklist, reminders & logistics tracker.</p>
       </div>
 
-      {/* Progress */}
-      <Card className="border-border">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="font-display font-semibold text-foreground">Overall Progress</h3>
-            <span className="font-display text-2xl font-bold text-primary">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-3" />
-          <p className="text-sm text-muted-foreground">{doneCount} of {tasks.length} tasks completed</p>
-        </CardContent>
-      </Card>
+      {/* Event Selector */}
+      {events.length > 0 ? (
+        <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+          <SelectTrigger className="w-full md:w-72">
+            <SelectValue placeholder="Select an event" />
+          </SelectTrigger>
+          <SelectContent>
+            {events.map((e) => (
+              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Card className="border-border">
+          <CardContent className="p-6 text-center text-muted-foreground">
+            Create an event first to use the checklist.
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Category Filter */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map((cat) => (
-          <Badge
-            key={cat}
-            variant={filter === cat ? "default" : "outline"}
-            className={`cursor-pointer ${filter === cat ? "gradient-sunset text-primary-foreground border-transparent" : ""}`}
-            onClick={() => setFilter(cat)}
-          >
-            {cat}
-          </Badge>
-        ))}
-      </div>
-
-      {/* Task List */}
-      <div className="space-y-2">
-        {filtered.map((task) => (
-          <Card key={task.id} className={`border-border transition-all ${task.done ? "opacity-60" : ""}`}>
-            <CardContent className="p-4 flex items-center gap-4">
-              <Checkbox checked={task.done} onCheckedChange={() => toggleTask(task.id)} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                  {task.text}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="secondary" className="text-xs">{task.category}</Badge>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {task.dueIn}
-                  </span>
-                </div>
+      {selectedEvent && (
+        <>
+          {/* Progress */}
+          <Card className="border-border">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="font-display font-semibold text-foreground">Overall Progress</h3>
+                <span className="font-display text-2xl font-bold text-primary">{progress}%</span>
               </div>
-              <Badge variant="outline" className={`text-xs ${priorityColors[task.priority]}`}>
-                {task.priority}
-              </Badge>
+              <Progress value={progress} className="h-3" />
+              <p className="text-sm text-muted-foreground">{doneCount} of {items.length} tasks completed</p>
             </CardContent>
           </Card>
-        ))}
-      </div>
+
+          {/* Add Task */}
+          <Card className="border-border">
+            <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
+              <Input
+                placeholder="Add a new task..."
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="flex-1"
+                maxLength={200}
+                onKeyDown={(e) => e.key === "Enter" && addItem()}
+              />
+              <Select value={newCategory} onValueChange={setNewCategory}>
+                <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {categories.filter((c) => c !== "All").map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="hero" size="sm" onClick={addItem} disabled={adding || !newTitle.trim()}>
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Seed defaults */}
+          {!loading && items.length === 0 && (
+            <Card className="border-border">
+              <CardContent className="p-6 text-center space-y-3">
+                <p className="text-muted-foreground">No tasks yet for this event.</p>
+                <Button variant="outline" onClick={seedDefaults} disabled={adding}>
+                  {adding ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                  Load Default African Event Checklist
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Category Filter */}
+          {items.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <Badge
+                  key={cat}
+                  variant={filter === cat ? "default" : "outline"}
+                  className={`cursor-pointer ${filter === cat ? "gradient-sunset text-primary-foreground border-transparent" : ""}`}
+                  onClick={() => setFilter(cat)}
+                >
+                  {cat}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Task List */}
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((task) => (
+                <Card key={task.id} className={`border-border transition-all ${task.is_completed ? "opacity-60" : ""}`}>
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <Checkbox checked={task.is_completed} onCheckedChange={() => toggleItem(task)} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${task.is_completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                        {task.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="text-xs">{task.category}</Badge>
+                        {task.due_date && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {task.due_date}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => deleteItem(task.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Resources */}
       <Card className="border-border">
