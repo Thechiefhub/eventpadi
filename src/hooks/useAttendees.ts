@@ -112,6 +112,24 @@ export function useAttendees(eventId: string) {
     await supabase.from("attendees").update({ checked_in: false, checked_in_at: null, checked_in_by: null }).eq("id", attendeeId);
   }, []);
 
+  // Generate ticket IDs for attendees missing them
+  const generateMissingTicketIds = useCallback(async () => {
+    const missing = attendees.filter((a) => !a.ticket_id);
+    if (missing.length === 0) { toast.info("All attendees already have ticket IDs"); return; }
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const genCode = () => {
+      let code = "";
+      for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return `TKT-${code}`;
+    };
+    for (const a of missing) {
+      const ticket_id = genCode();
+      await supabase.from("attendees").update({ ticket_id }).eq("id", a.id);
+    }
+    toast.success(`Generated ${missing.length} ticket ID(s)`);
+    fetchAttendees();
+  }, [attendees, fetchAttendees]);
+
   // Sync offline queue
   const syncOfflineQueue = useCallback(async () => {
     if (!user) return;
@@ -149,5 +167,5 @@ export function useAttendees(eventId: string) {
     }
   }, [eventId]);
 
-  return { attendees, loading, fetchAttendees, checkIn, undoCheckIn, setAttendees };
+  return { attendees, loading, fetchAttendees, checkIn, undoCheckIn, setAttendees, generateMissingTicketIds };
 }
