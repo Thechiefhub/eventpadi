@@ -70,19 +70,30 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
     if (file) handleFile(file);
   };
 
+  // Generate a short unique ticket ID (e.g., "TKT-A1B2C3")
+  const generateTicketId = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `TKT-${code}`;
+  };
+
   const handleSubmit = async () => {
     if (!mapping.name) { toast.error("Name field is required"); return; }
     if (!user) return;
     setUploading(true);
-    const rows = rawData.map((row) => ({
-      event_id: eventId,
-      user_id: user.id,
-      name: String(row[mapping.name] || "").trim(),
-      email: mapping.email ? String(row[mapping.email] || "").trim() || null : null,
-      phone: mapping.phone ? String(row[mapping.phone] || "").trim() || null : null,
-      role: mapping.role ? String(row[mapping.role] || "").trim() || "attendee" : "attendee",
-      ticket_id: mapping.ticket_id ? String(row[mapping.ticket_id] || "").trim() || null : null,
-    })).filter((r) => r.name.length > 0);
+    const rows = rawData.map((row) => {
+      const existingTicket = mapping.ticket_id ? String(row[mapping.ticket_id] || "").trim() : "";
+      return {
+        event_id: eventId,
+        user_id: user.id,
+        name: String(row[mapping.name] || "").trim(),
+        email: mapping.email ? String(row[mapping.email] || "").trim() || null : null,
+        phone: mapping.phone ? String(row[mapping.phone] || "").trim() || null : null,
+        role: mapping.role ? String(row[mapping.role] || "").trim() || "attendee" : "attendee",
+        ticket_id: existingTicket || generateTicketId(), // Auto-generate if missing
+      };
+    }).filter((r) => r.name.length > 0);
 
     // Batch insert in chunks of 500
     let inserted = 0;
