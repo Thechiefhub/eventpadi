@@ -6,13 +6,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Palette, WifiOff, Info } from "lucide-react";
+import { Sparkles, WifiOff, Info } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEventSelect } from "@/hooks/useEventSelect";
@@ -20,6 +15,7 @@ import { toast } from "sonner";
 import SparkForm, { type SparkContext } from "@/components/spark/SparkForm";
 import SparkResults, { type NameCategory, type NameSuggestion } from "@/components/spark/SparkResults";
 import SparkThemes, { type ThemePackage } from "@/components/spark/SparkThemes";
+import VisualIdentityStudio from "@/components/spark/VisualIdentityStudio";
 
 const CACHE_KEY = "spark_last_generation";
 
@@ -234,42 +230,7 @@ export default function SparkModule() {
         </TabsContent>
 
         <TabsContent value="visual" className="mt-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <Palette className="h-5 w-5 text-primary" /> Visual Identity Studio
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Describe your event visual</Label>
-                <Input placeholder="e.g. A modern fintech conference in Lagos with skyscrapers and traditional motifs" />
-              </div>
-              <div className="space-y-2">
-                <Label>Pattern Style</Label>
-                <div className="flex flex-wrap gap-2">
-                  {["Ankara", "Kente", "Mudcloth", "Shweshwe", "Geometric", "Minimalist"].map((p) => (
-                    <Badge key={p} variant="outline" className="cursor-pointer hover:bg-muted">
-                      {p}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <Button variant="hero">
-                <Sparkles className="h-4 w-4 mr-1" /> Generate Visuals
-              </Button>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-muted border border-border flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Palette className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      <p className="text-xs">Generated visual {i}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <VisualIdentityStudio />
         </TabsContent>
       </Tabs>
     </div>
