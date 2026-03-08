@@ -21,6 +21,26 @@ export default function DDayDashboard({ attendees }: Props) {
   const remaining = total - checkedIn;
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
 
+  // Build check-in over time chart data (cumulative, bucketed by minute)
+  const chartData = useMemo(() => {
+    const checkedInList = attendees
+      .filter((a) => a.checked_in && a.checked_in_at)
+      .sort((a, b) => new Date(a.checked_in_at!).getTime() - new Date(b.checked_in_at!).getTime());
+    if (checkedInList.length === 0) return [];
+
+    const buckets = new Map<string, number>();
+    checkedInList.forEach((a) => {
+      const key = format(new Date(a.checked_in_at!), "HH:mm");
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    });
+
+    let cumulative = 0;
+    return Array.from(buckets.entries()).map(([time, count]) => {
+      cumulative += count;
+      return { time, count: cumulative, rate: Math.round((cumulative / total) * 100) };
+    });
+  }, [attendees, total]);
+
   const openModal = (filter: AttendeeFilter, title: string) => {
     setModalFilter(filter);
     setModalTitle(title);
