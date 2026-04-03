@@ -136,7 +136,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
 
   // CSV export
   const exportCSV = () => {
-    const rows = [["Name", "Email", "Phone", "Role", "Status", "Check-In Time"]];
+    const rows = [["Name", "Email", "Phone", "Role", "Status", "Check-In Time", "Certificate"]];
     sorted.forEach((a) => {
       rows.push([
         a.name,
@@ -145,6 +145,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
         a.role || "attendee",
         a.checked_in ? "Checked In" : "Not Checked In",
         a.checked_in_at ? format(new Date(a.checked_in_at), "yyyy-MM-dd HH:mm:ss") : "",
+        a.certificate_sent_at ? "Sent" : "—",
       ]);
     });
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
