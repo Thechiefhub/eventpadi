@@ -103,6 +103,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
         case "role": aVal = a.role || ""; bVal = b.role || ""; break;
         case "checked_in": aVal = a.checked_in; bVal = b.checked_in; break;
         case "checked_in_at": aVal = a.checked_in_at || ""; bVal = b.checked_in_at || ""; break;
+        case "certificate": aVal = a.certificate_sent_at || ""; bVal = b.certificate_sent_at || ""; break;
       }
       if (typeof aVal === "boolean") {
         return sortDir === "asc" ? (aVal === bVal ? 0 : aVal ? 1 : -1) : (aVal === bVal ? 0 : aVal ? -1 : 1);
