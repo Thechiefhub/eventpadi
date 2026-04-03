@@ -207,11 +207,12 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                   ["role", "Role"],
                   ["checked_in", "Status"],
                   ["checked_in_at", "Check-In Time"],
+                  ["certificate", "Certificate"],
                 ] as [SortKey, string][]).map(([key, label]) => (
                   <TableHead
                     key={key}
                     className={`cursor-pointer select-none whitespace-nowrap ${
-                      key === "phone" || key === "email" ? "hidden md:table-cell" : ""
+                      key === "phone" || key === "email" || key === "certificate" ? "hidden md:table-cell" : ""
                     }`}
                     onClick={() => toggleSort(key)}
                   >
