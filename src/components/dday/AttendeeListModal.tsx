@@ -227,7 +227,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                     No attendees found
                   </TableCell>
                 </TableRow>
