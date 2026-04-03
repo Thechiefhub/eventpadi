@@ -102,8 +102,33 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
       return false;
     }
     toast.success("Checked in!");
+
+    // Trigger certificate generation (fire-and-forget)
+    const attendee = attendees.find((a) => a.id === attendeeId);
+    if (attendee && attendee.email && !attendee.certificate_sent_at) {
+      const certId = `CERT-${attendeeId.slice(0, 8).toUpperCase()}-${Date.now()}`;
+      const location = [eventData?.city, eventData?.country].filter(Boolean).join(", ");
+      supabase.functions.invoke("send-certificate", {
+        body: {
+          attendeeId,
+          attendeeName: attendee.name,
+          attendeeEmail: attendee.email,
+          eventName: eventData?.name || "Event",
+          eventDate: eventData?.event_date || null,
+          eventLocation: location || null,
+          certificateId: certId,
+        },
+      }).then(({ error: certError }) => {
+        if (certError) {
+          console.warn("Certificate generation failed:", certError);
+        } else {
+          toast.success(`Certificate sent to ${attendee.email}`);
+        }
+      });
+    }
+
     return true;
-  }, [user]);
+  }, [user, attendees, eventData]);
 
   const undoCheckIn = useCallback(async (attendeeId: string) => {
     setAttendees((prev) =>
