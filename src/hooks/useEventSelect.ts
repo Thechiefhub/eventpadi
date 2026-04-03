@@ -6,6 +6,8 @@ interface Event {
   id: string;
   name: string;
   event_date: string | null;
+  city: string | null;
+  country: string | null;
 }
 
 export function useEventSelect() {
