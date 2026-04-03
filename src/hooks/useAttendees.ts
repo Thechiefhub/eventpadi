@@ -24,7 +24,7 @@ export interface Attendee {
 const OFFLINE_QUEUE_KEY = "dday_checkin_queue";
 const OFFLINE_CACHE_KEY = "dday_attendee_cache";
 
-export function useAttendees(eventId: string) {
+export function useAttendees(eventId: string, eventData?: { name: string; event_date?: string | null; city?: string | null; country?: string | null }) {
   const { user } = useAuth();
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [loading, setLoading] = useState(true);
