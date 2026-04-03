@@ -52,7 +52,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at";
+type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at" | "certificate";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
