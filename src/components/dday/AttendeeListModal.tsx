@@ -252,6 +252,19 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {a.checked_in_at ? format(new Date(a.checked_in_at), "HH:mm:ss") : "—"}
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {a.certificate_sent_at ? (
+                        <Badge className="bg-[hsl(var(--earth-green))] text-primary-foreground border-0 text-[10px]">
+                          Sent
+                        </Badge>
+                      ) : a.checked_in && a.email ? (
+                        <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                          Pending
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
