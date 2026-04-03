@@ -52,7 +52,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at";
+type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at" | "certificate";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
@@ -103,6 +103,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
         case "role": aVal = a.role || ""; bVal = b.role || ""; break;
         case "checked_in": aVal = a.checked_in; bVal = b.checked_in; break;
         case "checked_in_at": aVal = a.checked_in_at || ""; bVal = b.checked_in_at || ""; break;
+        case "certificate": aVal = a.certificate_sent_at || ""; bVal = b.certificate_sent_at || ""; break;
       }
       if (typeof aVal === "boolean") {
         return sortDir === "asc" ? (aVal === bVal ? 0 : aVal ? 1 : -1) : (aVal === bVal ? 0 : aVal ? -1 : 1);
@@ -135,7 +136,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
 
   // CSV export
   const exportCSV = () => {
-    const rows = [["Name", "Email", "Phone", "Role", "Status", "Check-In Time"]];
+    const rows = [["Name", "Email", "Phone", "Role", "Status", "Check-In Time", "Certificate"]];
     sorted.forEach((a) => {
       rows.push([
         a.name,
@@ -144,6 +145,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
         a.role || "attendee",
         a.checked_in ? "Checked In" : "Not Checked In",
         a.checked_in_at ? format(new Date(a.checked_in_at), "yyyy-MM-dd HH:mm:ss") : "",
+        a.certificate_sent_at ? "Sent" : "—",
       ]);
     });
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -205,11 +207,12 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                   ["role", "Role"],
                   ["checked_in", "Status"],
                   ["checked_in_at", "Check-In Time"],
+                  ["certificate", "Certificate"],
                 ] as [SortKey, string][]).map(([key, label]) => (
                   <TableHead
                     key={key}
                     className={`cursor-pointer select-none whitespace-nowrap ${
-                      key === "phone" || key === "email" ? "hidden md:table-cell" : ""
+                      key === "phone" || key === "email" || key === "certificate" ? "hidden md:table-cell" : ""
                     }`}
                     onClick={() => toggleSort(key)}
                   >
@@ -224,7 +227,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                     No attendees found
                   </TableCell>
                 </TableRow>
@@ -248,6 +251,19 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {a.checked_in_at ? format(new Date(a.checked_in_at), "HH:mm:ss") : "—"}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {a.certificate_sent_at ? (
+                        <Badge className="bg-[hsl(var(--earth-green))] text-primary-foreground border-0 text-[10px]">
+                          Sent
+                        </Badge>
+                      ) : a.checked_in && a.email ? (
+                        <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                          Pending
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

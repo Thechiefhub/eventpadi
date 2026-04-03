@@ -15,6 +15,8 @@ export interface Attendee {
   checked_in: boolean;
   checked_in_at: string | null;
   checked_in_by: string | null;
+  certificate_url: string | null;
+  certificate_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,7 +24,7 @@ export interface Attendee {
 const OFFLINE_QUEUE_KEY = "dday_checkin_queue";
 const OFFLINE_CACHE_KEY = "dday_attendee_cache";
 
-export function useAttendees(eventId: string) {
+export function useAttendees(eventId: string, eventData?: { name: string; event_date?: string | null; city?: string | null; country?: string | null }) {
   const { user } = useAuth();
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,8 +102,33 @@ export function useAttendees(eventId: string) {
       return false;
     }
     toast.success("Checked in!");
+
+    // Trigger certificate generation (fire-and-forget)
+    const attendee = attendees.find((a) => a.id === attendeeId);
+    if (attendee && attendee.email && !attendee.certificate_sent_at) {
+      const certId = `CERT-${attendeeId.slice(0, 8).toUpperCase()}-${Date.now()}`;
+      const location = [eventData?.city, eventData?.country].filter(Boolean).join(", ");
+      supabase.functions.invoke("send-certificate", {
+        body: {
+          attendeeId,
+          attendeeName: attendee.name,
+          attendeeEmail: attendee.email,
+          eventName: eventData?.name || "Event",
+          eventDate: eventData?.event_date || null,
+          eventLocation: location || null,
+          certificateId: certId,
+        },
+      }).then(({ error: certError }) => {
+        if (certError) {
+          console.warn("Certificate generation failed:", certError);
+        } else {
+          toast.success(`Certificate sent to ${attendee.email}`);
+        }
+      });
+    }
+
     return true;
-  }, [user]);
+  }, [user, attendees, eventData]);
 
   const undoCheckIn = useCallback(async (attendeeId: string) => {
     setAttendees((prev) =>

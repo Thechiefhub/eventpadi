@@ -30,7 +30,8 @@ import BadgeGenerator from "@/components/dday/BadgeGenerator";
 export default function DDayModule() {
   const { user } = useAuth();
   const { events, selectedEventId, setSelectedEventId, loading: eventsLoading } = useEventSelect();
-  const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId);
+  const selectedEvent = events.find((e) => e.id === selectedEventId);
+  const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId, selectedEvent ? { name: selectedEvent.name, event_date: selectedEvent.event_date, city: selectedEvent.city, country: selectedEvent.country } : undefined);
 
   // Event owner is always admin; could extend with team role check in the future
   const isAdmin = !!user && events.some((e) => e.id === selectedEventId);

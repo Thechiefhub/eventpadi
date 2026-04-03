@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.spark-studio]
 verify_jwt = false
+
+[functions.send-certificate]
+verify_jwt = false

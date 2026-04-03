@@ -6,6 +6,8 @@ interface Event {
   id: string;
   name: string;
   event_date: string | null;
+  city: string | null;
+  country: string | null;
 }
 
 export function useEventSelect() {
@@ -19,7 +21,7 @@ export function useEventSelect() {
     const fetchEvents = async () => {
       const { data } = await supabase
         .from("events")
-        .select("id, name, event_date")
+        .select("id, name, event_date, city, country")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (data && data.length > 0) {
