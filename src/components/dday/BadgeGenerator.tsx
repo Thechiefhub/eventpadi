@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2 } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check } from "lucide-react";
 import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
