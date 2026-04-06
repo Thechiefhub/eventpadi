@@ -84,6 +84,9 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                 level="M"
                 includeMargin
               />
+              <p className="font-mono text-[11px] text-muted-foreground tracking-wider bg-muted px-2 py-0.5 rounded">
+                {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
+              </p>
               <p className="font-display font-bold text-foreground text-sm">{a.name}</p>
               <p className="text-xs text-muted-foreground">{a.email || a.phone || ""}</p>
               {a.role && (
@@ -107,6 +110,9 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
         {attendees.map((a) => (
           <div key={a.id} className="badge">
             <QRCodeSVG value={a.ticket_id || a.id} size={90} level="M" includeMargin />
+            <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#888", letterSpacing: "2px", margin: "4px 0" }}>
+              {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
+            </p>
             <h3>{a.name}</h3>
             <p>{a.email || a.phone || ""}</p>
             {a.role && <span className="role">{a.role}</span>}
