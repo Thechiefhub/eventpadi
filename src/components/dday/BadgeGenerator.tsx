@@ -246,3 +246,31 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
     </div>
   );
 }
+
+function CertificateLinkCard() {
+  const [copied, setCopied] = useState(false);
+  const certUrl = `${window.location.origin}/certificate`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(certUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card className="border-border bg-muted/30">
+      <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex items-center gap-2 text-primary">
+          <Link2 className="h-5 w-5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Certificate Download Page</p>
+            <p className="text-xs text-muted-foreground">Share this link so attendees can download their certificates using their ticket ID</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0 ml-auto" onClick={handleCopy}>
+          {copied ? <><Check className="h-3.5 w-3.5 mr-1" /> Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1" /> Copy Link</>}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
