@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2 } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check } from "lucide-react";
 import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,6 +133,9 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
         </div>
       </div>
 
+      {/* Certificate download link for attendees */}
+      <CertificateLinkCard />
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -244,5 +247,33 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
         {attendees.map((a) => badgeHTML(a, eventName))}
       </div>
     </div>
+  );
+}
+
+function CertificateLinkCard() {
+  const [copied, setCopied] = useState(false);
+  const certUrl = `${window.location.origin}/certificate`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(certUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card className="border-border bg-muted/30">
+      <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex items-center gap-2 text-primary">
+          <Link2 className="h-5 w-5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Certificate Download Page</p>
+            <p className="text-xs text-muted-foreground">Share this link so attendees can download their certificates using their ticket ID</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0 ml-auto" onClick={handleCopy}>
+          {copied ? <><Check className="h-3.5 w-3.5 mr-1" /> Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1" /> Copy Link</>}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

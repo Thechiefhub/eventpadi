@@ -18,6 +18,7 @@ import DDayModule from "./pages/DDayModule";
 import ShortlistPage from "./pages/ShortlistPage";
 import NarrativeStudioPage from "./pages/NarrativeStudioPage";
 import AcceptInvite from "./pages/AcceptInvite";
+import CertificateLookup from "./pages/CertificateLookup";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
+            <Route path="/certificate" element={<CertificateLookup />} />
             <Route
               path="/dashboard"
               element={
