@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2 } from "lucide-react";
+import { toPng } from "html-to-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +48,27 @@ function badgeHTML(a: Attendee, eventName: string, innerRef?: React.RefObject<HT
 export default function BadgeGenerator({ attendees, eventName, onGenerateMissingIds }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
+  const badgeCardRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPNG = useCallback(async () => {
+    if (!badgeCardRef.current || !selectedAttendee) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(badgeCardRef.current, { pixelRatio: 3, backgroundColor: "#ffffff" });
+      const link = document.createElement("a");
+      link.download = `badge-${selectedAttendee.name.replace(/\s+/g, "-").toLowerCase()}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("Badge downloaded!");
+    } catch {
+      toast.error("Failed to generate image");
+    } finally {
+      setDownloading(false);
+    }
+  }, [selectedAttendee]);
   const missingCount = attendees.filter((a) => !a.ticket_id).length;
 
   const filtered = search.trim()
@@ -177,7 +197,7 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
           </DialogHeader>
           {selectedAttendee && (
             <div className="flex flex-col items-center gap-4">
-              <Card className="border-border w-full max-w-xs text-center">
+              <Card className="border-border w-full max-w-xs text-center" ref={badgeCardRef}>
                 <CardContent className="p-6 flex flex-col items-center gap-3">
                   <QRCodeSVG value={selectedAttendee.ticket_id || selectedAttendee.id} size={140} level="M" includeMargin />
                   <p className="font-mono text-xs text-muted-foreground tracking-widest bg-muted px-3 py-1 rounded">
@@ -197,8 +217,12 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedAttendee(null)}>
                   Close
                 </Button>
+                <Button variant="outline" className="flex-1" onClick={handleDownloadPNG} disabled={downloading}>
+                  {downloading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+                  PNG
+                </Button>
                 <Button className="flex-1 gradient-sunset text-primary-foreground" onClick={handlePrintSingle}>
-                  <Printer className="h-4 w-4 mr-1" /> Print Badge
+                  <Printer className="h-4 w-4 mr-1" /> Print
                 </Button>
               </div>
             </div>
