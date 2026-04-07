@@ -100,6 +100,7 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
                 <p className="font-display font-bold text-foreground">{lastCheckedIn.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {lastCheckedIn.checked_in ? "✓ Checked in" : ""}
+                  {lastCheckedIn.admits > 1 && ` · Admit ${lastCheckedIn.admits}`}
                 </p>
               </div>
             </div>
