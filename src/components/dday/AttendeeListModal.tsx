@@ -52,7 +52,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-type SortKey = "name" | "email" | "phone" | "role" | "checked_in" | "checked_in_at" | "certificate";
+type SortKey = "name" | "email" | "phone" | "role" | "admits" | "checked_in" | "checked_in_at" | "certificate";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
@@ -101,6 +101,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
         case "email": aVal = a.email || ""; bVal = b.email || ""; break;
         case "phone": aVal = a.phone || ""; bVal = b.phone || ""; break;
         case "role": aVal = a.role || ""; bVal = b.role || ""; break;
+        case "admits": return sortDir === "asc" ? a.admits - b.admits : b.admits - a.admits;
         case "checked_in": aVal = a.checked_in; bVal = b.checked_in; break;
         case "checked_in_at": aVal = a.checked_in_at || ""; bVal = b.checked_in_at || ""; break;
         case "certificate": aVal = a.certificate_sent_at || ""; bVal = b.certificate_sent_at || ""; break;
@@ -136,13 +137,14 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
 
   // CSV export
   const exportCSV = () => {
-    const rows = [["Name", "Email", "Phone", "Role", "Status", "Check-In Time", "Certificate"]];
+    const rows = [["Name", "Email", "Phone", "Role", "Admits", "Status", "Check-In Time", "Certificate"]];
     sorted.forEach((a) => {
       rows.push([
         a.name,
         a.email || "",
         a.phone || "",
         a.role || "attendee",
+        String(a.admits),
         a.checked_in ? "Checked In" : "Not Checked In",
         a.checked_in_at ? format(new Date(a.checked_in_at), "yyyy-MM-dd HH:mm:ss") : "",
         a.certificate_sent_at ? "Sent" : "—",
@@ -205,6 +207,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                   ["email", "Email"],
                   ["phone", "Phone"],
                   ["role", "Role"],
+                  ["admits", "Admits"],
                   ["checked_in", "Status"],
                   ["checked_in_at", "Check-In Time"],
                   ["certificate", "Certificate"],
@@ -213,6 +216,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                     key={key}
                     className={`cursor-pointer select-none whitespace-nowrap ${
                       key === "phone" || key === "email" || key === "certificate" ? "hidden md:table-cell" : ""
+                    }`}
                     }`}
                     onClick={() => toggleSort(key)}
                   >
@@ -227,7 +231,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                     No attendees found
                   </TableCell>
                 </TableRow>
@@ -238,6 +242,7 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                     <TableCell className="hidden md:table-cell text-muted-foreground">{a.email || "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{a.phone || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{a.role || "attendee"}</TableCell>
+                    <TableCell className="text-center font-medium">{a.admits}</TableCell>
                     <TableCell>
                       {a.checked_in ? (
                         <Badge className="bg-[hsl(var(--earth-green))] text-primary-foreground border-0">
