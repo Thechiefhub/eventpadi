@@ -31,7 +31,7 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
   const [step, setStep] = useState<"upload" | "map" | "preview">("upload");
   const [rawData, setRawData] = useState<Record<string, string>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<FieldMapping>({ name: "", email: "", phone: "", role: "", ticket_id: "" });
+  const [mapping, setMapping] = useState<FieldMapping>({ name: "", email: "", phone: "", role: "", ticket_id: "", admits: "" });
   const [uploading, setUploading] = useState(false);
 
   const handleFile = useCallback((file: File) => {
@@ -47,14 +47,15 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
         const cols = Object.keys(json[0]);
         setColumns(cols);
         // Auto-map common column names
-        const autoMap: FieldMapping = { name: "", email: "", phone: "", role: "", ticket_id: "" };
+        const autoMap: FieldMapping = { name: "", email: "", phone: "", role: "", ticket_id: "", admits: "" };
         for (const col of cols) {
           const lc = col.toLowerCase();
           if (lc.includes("name") && !autoMap.name) autoMap.name = col;
           else if (lc.includes("email") && !autoMap.email) autoMap.email = col;
           else if ((lc.includes("phone") || lc.includes("mobile") || lc.includes("whatsapp")) && !autoMap.phone) autoMap.phone = col;
           else if (lc.includes("role") || lc.includes("type") || lc.includes("category")) { if (!autoMap.role) autoMap.role = col; }
-          else if (lc.includes("ticket") || lc.includes("id") || lc.includes("code")) { if (!autoMap.ticket_id) autoMap.ticket_id = col; }
+          else if (lc.includes("ticket") || lc.includes("code")) { if (!autoMap.ticket_id) autoMap.ticket_id = col; }
+          else if (lc.includes("admit") || lc.includes("guest") || lc.includes("pax")) { if (!autoMap.admits) autoMap.admits = col; }
         }
         setMapping(autoMap);
         setStep("map");
@@ -85,6 +86,7 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
     setUploading(true);
     const rows = rawData.map((row) => {
       const existingTicket = mapping.ticket_id ? String(row[mapping.ticket_id] || "").trim() : "";
+      const admitsRaw = mapping.admits ? parseInt(String(row[mapping.admits] || "1").trim(), 10) : 1;
       return {
         event_id: eventId,
         user_id: user.id,
@@ -92,7 +94,8 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
         email: mapping.email ? String(row[mapping.email] || "").trim() || null : null,
         phone: mapping.phone ? String(row[mapping.phone] || "").trim() || null : null,
         role: mapping.role ? String(row[mapping.role] || "").trim() || "attendee" : "attendee",
-        ticket_id: existingTicket || generateTicketId(), // Auto-generate if missing
+        ticket_id: existingTicket || generateTicketId(),
+        admits: isNaN(admitsRaw) || admitsRaw < 1 ? 1 : admitsRaw,
       };
     }).filter((r) => r.name.length > 0);
 
@@ -135,6 +138,7 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
     { key: "phone", label: "Phone" },
     { key: "role", label: "Role" },
     { key: "ticket_id", label: "Ticket / QR ID" },
+    { key: "admits", label: "Admit(s)" },
   ];
 
   return (
