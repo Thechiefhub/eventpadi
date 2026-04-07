@@ -40,6 +40,7 @@ function badgeHTML(a: Attendee, eventName: string, innerRef?: React.RefObject<HT
       <h3>{a.name}</h3>
       <p>{a.email || a.phone || ""}</p>
       {a.role && <span className="role">{a.role}</span>}
+      {a.admits > 1 && <span className="role" style={{ background: "#2563eb", marginLeft: "4px" }}>Admit {a.admits}</span>}
       <p className="event">{eventName}</p>
     </div>
   );
@@ -172,6 +173,11 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                   {a.role}
                 </Badge>
               )}
+              {a.admits > 1 && (
+                <Badge variant="secondary" className="text-xs">
+                  Admit {a.admits}
+                </Badge>
+              )}
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{eventName}</p>
             </CardContent>
           </Card>
@@ -206,14 +212,19 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                   <p className="font-mono text-xs text-muted-foreground tracking-widest bg-muted px-3 py-1 rounded">
                     {selectedAttendee.ticket_id || selectedAttendee.id.slice(0, 12).toUpperCase()}
                   </p>
-                  <p className="font-display font-bold text-foreground text-lg">{selectedAttendee.name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedAttendee.email || selectedAttendee.phone || ""}</p>
-                  {selectedAttendee.role && (
-                    <Badge className="gradient-sunset text-primary-foreground text-sm border-transparent">
-                      {selectedAttendee.role}
-                    </Badge>
-                  )}
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest">{eventName}</p>
+                   <p className="font-display font-bold text-foreground text-lg">{selectedAttendee.name}</p>
+                   <p className="text-sm text-muted-foreground">{selectedAttendee.email || selectedAttendee.phone || ""}</p>
+                   {selectedAttendee.role && (
+                     <Badge className="gradient-sunset text-primary-foreground text-sm border-transparent">
+                       {selectedAttendee.role}
+                     </Badge>
+                   )}
+                   {selectedAttendee.admits > 1 && (
+                     <Badge variant="secondary" className="text-sm">
+                       Admit {selectedAttendee.admits}
+                     </Badge>
+                   )}
+                   <p className="text-xs text-muted-foreground uppercase tracking-widest">{eventName}</p>
                 </CardContent>
               </Card>
               <div className="flex gap-2 w-full">
