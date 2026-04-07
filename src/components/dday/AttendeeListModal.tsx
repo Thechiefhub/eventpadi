@@ -217,7 +217,6 @@ export default function AttendeeListModal({ open, onOpenChange, attendees, filte
                     className={`cursor-pointer select-none whitespace-nowrap ${
                       key === "phone" || key === "email" || key === "certificate" ? "hidden md:table-cell" : ""
                     }`}
-                    }`}
                     onClick={() => toggleSort(key)}
                   >
                     <span className="inline-flex items-center">
