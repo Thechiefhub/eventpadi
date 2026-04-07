@@ -16,6 +16,7 @@ export interface Attendee {
   checked_in_at: string | null;
   checked_in_by: string | null;
   certificate_url: string | null;
+  admits: number;
   certificate_sent_at: string | null;
   created_at: string;
   updated_at: string;

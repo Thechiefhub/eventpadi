@@ -156,6 +156,7 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
                     <p className="font-medium text-foreground truncate">{a.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {a.email || a.phone || a.role}
+                      {a.admits > 1 && <span className="ml-1 font-medium text-primary"> · {a.admits} admit(s)</span>}
                     </p>
                   </div>
                 </div>

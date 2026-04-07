@@ -23,6 +23,7 @@ type FieldMapping = {
   phone: string;
   role: string;
   ticket_id: string;
+  admits: string;
 };
 
 export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props) {
