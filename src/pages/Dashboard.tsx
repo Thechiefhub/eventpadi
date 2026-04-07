@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Lightbulb, Handshake, Megaphone, Settings, CalendarDays, CheckCircle2, Users, TrendingUp, Plus, MapPin } from "lucide-react";
+import { Lightbulb, Handshake, Megaphone, Settings, CalendarDays, CheckCircle2, Users, TrendingUp, Plus, MapPin, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import NewEventDialog from "@/components/NewEventDialog";
 import { format, differenceInDays } from "date-fns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 interface Event {
   id: string;
@@ -64,6 +66,22 @@ export default function Dashboard() {
     { label: "Sponsors Contacted", value: String(sponsorCount), icon: Users, color: "text-sunset-gold" },
     { label: "Posts Scheduled", value: String(postCount), icon: TrendingUp, color: "text-kente-red" },
   ];
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+    setDeletingId(eventId);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", eventId);
+      if (error) throw error;
+      toast.success(`"${eventName}" deleted.`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete event.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const nextEvent = events.find((e) => e.event_date && new Date(e.event_date) >= new Date());
 
@@ -124,9 +142,28 @@ export default function Dashboard() {
               return (
                 <Card key={event.id} className="border-border bg-card hover:shadow-warm transition-all">
                   <CardContent className="p-5 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-display font-semibold text-foreground text-lg">{event.name}</h3>
-                      <Badge variant="outline" className="capitalize text-xs">{event.event_type}</Badge>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-display font-semibold text-foreground text-lg flex-1">{event.name}</h3>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="capitalize text-xs">{event.event_type}</Badge>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                              {deletingId === event.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete "{event.name}"?</AlertDialogTitle>
+                              <AlertDialogDescription>This will permanently remove this event and all its associated data. This action cannot be undone.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                       {event.event_date && (
