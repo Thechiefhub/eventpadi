@@ -1,0 +1,1 @@
+ALTER TABLE public.attendees ADD COLUMN admits integer NOT NULL DEFAULT 1;

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       attendees: {
         Row: {
+          admits: number
           certificate_sent_at: string | null
           certificate_url: string | null
           checked_in: boolean
@@ -33,6 +34,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admits?: number
           certificate_sent_at?: string | null
           certificate_url?: string | null
           checked_in?: boolean
@@ -50,6 +52,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admits?: number
           certificate_sent_at?: string | null
           certificate_url?: string | null
           checked_in?: boolean
