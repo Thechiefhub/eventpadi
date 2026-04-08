@@ -1,10 +1,11 @@
 import { useState, useCallback } from "react";
-import { Upload, FileSpreadsheet, Loader2, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Download, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -141,36 +142,118 @@ export default function AttendeeUpload({ eventId, attendees, onUploaded }: Props
     { key: "admits", label: "Admit(s)" },
   ];
 
+  // Manual add attendee state
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualForm, setManualForm] = useState({ name: "", email: "", phone: "", role: "", admits: "1" });
+  const [addingManual, setAddingManual] = useState(false);
+
+  const handleManualAdd = async () => {
+    if (!manualForm.name.trim()) { toast.error("Name is required"); return; }
+    if (!user) return;
+    setAddingManual(true);
+    const admitsVal = parseInt(manualForm.admits, 10);
+    const { error } = await supabase.from("attendees").insert({
+      event_id: eventId,
+      user_id: user.id,
+      name: manualForm.name.trim(),
+      email: manualForm.email.trim() || null,
+      phone: manualForm.phone.trim() || null,
+      role: manualForm.role.trim() || "attendee",
+      ticket_id: generateTicketId(),
+      admits: isNaN(admitsVal) || admitsVal < 1 ? 1 : admitsVal,
+    });
+    if (error) {
+      toast.error(`Failed to add attendee: ${error.message}`);
+    } else {
+      toast.success(`${manualForm.name.trim()} added!`);
+      setManualForm({ name: "", email: "", phone: "", role: "", admits: "1" });
+      setShowManualForm(false);
+      onUploaded();
+    }
+    setAddingManual(false);
+  };
+
   return (
     <div className="space-y-4">
       {step === "upload" && (
         <>
-          <Card
-            className="border-dashed border-2 border-border cursor-pointer hover:border-primary/50 transition-colors"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => {
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = ".csv,.xlsx,.xls";
-              input.onchange = (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                if (file) handleFile(file);
-              };
-              input.click();
-            }}
-          >
-            <CardContent className="p-8 flex flex-col items-center text-center gap-3">
-              <Upload className="h-10 w-10 text-muted-foreground" />
-              <div>
-                <p className="font-display font-semibold text-foreground">Upload Attendee List</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Drag & drop a CSV or Excel file, or click to browse
-                </p>
-              </div>
-              <Badge variant="outline">CSV, XLSX, XLS</Badge>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Card
+              className="flex-1 border-dashed border-2 border-border cursor-pointer hover:border-primary/50 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".csv,.xlsx,.xls";
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (file) handleFile(file);
+                };
+                input.click();
+              }}
+            >
+              <CardContent className="p-8 flex flex-col items-center text-center gap-3">
+                <Upload className="h-10 w-10 text-muted-foreground" />
+                <div>
+                  <p className="font-display font-semibold text-foreground">Upload Attendee List</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Drag & drop a CSV or Excel file, or click to browse
+                  </p>
+                </div>
+                <Badge variant="outline">CSV, XLSX, XLS</Badge>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Manual Add Attendee */}
+          <Button variant="outline" className="w-full" onClick={() => setShowManualForm(!showManualForm)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            {showManualForm ? "Hide Form" : "Add Walk-in Guest Manually"}
+          </Button>
+
+          {showManualForm && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-display flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                  Register Walk-in Guest
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-sm">Name <span className="text-destructive">*</span></Label>
+                  <Input placeholder="Full name" value={manualForm.name} onChange={(e) => setManualForm((p) => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-sm">Email</Label>
+                    <Input type="email" placeholder="email@example.com" value={manualForm.email} onChange={(e) => setManualForm((p) => ({ ...p, email: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm">Phone</Label>
+                    <Input placeholder="+234..." value={manualForm.phone} onChange={(e) => setManualForm((p) => ({ ...p, phone: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-sm">Role</Label>
+                    <Input placeholder="e.g. Speaker, VIP, Guest" value={manualForm.role} onChange={(e) => setManualForm((p) => ({ ...p, role: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm">Admit(s)</Label>
+                    <Input type="number" min="1" placeholder="1" value={manualForm.admits} onChange={(e) => setManualForm((p) => ({ ...p, admits: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" onClick={() => setShowManualForm(false)}>Cancel</Button>
+                  <Button onClick={handleManualAdd} disabled={addingManual || !manualForm.name.trim()} className="gradient-sunset text-primary-foreground">
+                    {addingManual ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Adding...</> : "Add Attendee"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {attendees.length > 0 && (
             <div className="flex items-center justify-between">
