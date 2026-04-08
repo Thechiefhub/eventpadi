@@ -1,4 +1,4 @@
-import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck, Star } from "lucide-react";
+import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck, Star, Shield } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,10 @@ const moduleItems = [
   { title: "The Engine", url: "/dashboard/engine", icon: Settings },
   { title: "The D‑Day", url: "/dashboard/dday", icon: CalendarCheck },
   { title: "Shortlist", url: "/dashboard/shortlist", icon: Star },
+];
+
+const adminItems = [
+  { title: "Admin", url: "/dashboard/admin", icon: Shield },
 ];
 
 export function AppSidebar() {
@@ -70,6 +74,24 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {moduleItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <NavLink to={item.url} activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Admin</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {adminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
