@@ -40,7 +40,7 @@ function badgeHTML(a: Attendee, eventName: string, innerRef?: React.RefObject<HT
       <h3>{a.name}</h3>
       <p>{a.email || a.phone || ""}</p>
       {a.role && <span className="role">{a.role}</span>}
-      {a.admits > 1 && <span className="role" style={{ background: "#2563eb", marginLeft: "4px" }}>Admit {a.admits}</span>}
+      <span className="role" style={{ background: "#2563eb", marginLeft: "4px" }}>Admit {a.admits || 1}</span>
       <p className="event">{eventName}</p>
     </div>
   );
@@ -173,11 +173,9 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                   {a.role}
                 </Badge>
               )}
-              {a.admits > 1 && (
-                <Badge variant="secondary" className="text-xs">
-                  Admit {a.admits}
-                </Badge>
-              )}
+              <Badge variant="secondary" className="text-xs">
+                Admit {a.admits || 1}
+              </Badge>
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{eventName}</p>
             </CardContent>
           </Card>
@@ -219,11 +217,9 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                        {selectedAttendee.role}
                      </Badge>
                    )}
-                   {selectedAttendee.admits > 1 && (
-                     <Badge variant="secondary" className="text-sm">
-                       Admit {selectedAttendee.admits}
-                     </Badge>
-                   )}
+                   <Badge variant="secondary" className="text-sm">
+                     Admit {selectedAttendee.admits || 1}
+                   </Badge>
                    <p className="text-xs text-muted-foreground uppercase tracking-widest">{eventName}</p>
                 </CardContent>
               </Card>
