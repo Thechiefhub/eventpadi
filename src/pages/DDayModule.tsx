@@ -15,7 +15,7 @@
  * Real-time: All stats update live across all logged-in team members via WebSockets.
  */
 
-import { CalendarCheck, UserCheck, Users, Shield, QrCode } from "lucide-react";
+import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEventSelect } from "@/hooks/useEventSelect";
@@ -26,6 +26,7 @@ import CheckInInterface from "@/components/dday/CheckInInterface";
 import AttendeeUpload from "@/components/dday/AttendeeUpload";
 import TeamManager from "@/components/dday/TeamManager";
 import BadgeGenerator from "@/components/dday/BadgeGenerator";
+import CertificateSettings from "@/components/dday/CertificateSettings";
 
 export default function DDayModule() {
   const { user } = useAuth();
@@ -81,7 +82,7 @@ export default function DDayModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
             <Users className="h-4 w-4 mr-1 hidden sm:inline" /> Dashboard
           </TabsTrigger>
@@ -93,6 +94,9 @@ export default function DDayModule() {
           </TabsTrigger>
           <TabsTrigger value="badges" className="text-xs sm:text-sm">
             <QrCode className="h-4 w-4 mr-1 hidden sm:inline" /> Badges
+          </TabsTrigger>
+          <TabsTrigger value="certificates" className="text-xs sm:text-sm">
+            <Award className="h-4 w-4 mr-1 hidden sm:inline" /> Certs
           </TabsTrigger>
           <TabsTrigger value="team" className="text-xs sm:text-sm">
             <Shield className="h-4 w-4 mr-1 hidden sm:inline" /> Team
@@ -116,6 +120,13 @@ export default function DDayModule() {
             attendees={attendees}
             eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
             onGenerateMissingIds={generateMissingTicketIds}
+          />
+        </TabsContent>
+
+        <TabsContent value="certificates" className="mt-4">
+          <CertificateSettings
+            eventId={selectedEventId}
+            eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
           />
         </TabsContent>
 

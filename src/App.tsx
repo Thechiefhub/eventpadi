@@ -19,6 +19,7 @@ import ShortlistPage from "./pages/ShortlistPage";
 import NarrativeStudioPage from "./pages/NarrativeStudioPage";
 import AcceptInvite from "./pages/AcceptInvite";
 import CertificateLookup from "./pages/CertificateLookup";
+import AdminPage from "./pages/AdminPage";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="dday" element={<DDayModule />} />
               <Route path="shortlist" element={<ShortlistPage />} />
               <Route path="spark/studio" element={<NarrativeStudioPage />} />
+              <Route path="admin" element={<AdminPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
