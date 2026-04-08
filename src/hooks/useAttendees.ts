@@ -109,6 +109,21 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
     if (attendee && attendee.email && !attendee.certificate_sent_at) {
       const certId = `CERT-${attendeeId.slice(0, 8).toUpperCase()}-${Date.now()}`;
       const location = [eventData?.city, eventData?.country].filter(Boolean).join(", ");
+
+      // Load certificate settings
+      let certMode = "auto";
+      let customTemplateUrl: string | null = null;
+      let namePosition = { x: 50, y: 50 };
+      try {
+        const raw = localStorage.getItem(`cert_settings_${eventId}`);
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s.mode) certMode = s.mode;
+          if (s.templateUrl) customTemplateUrl = s.templateUrl;
+          if (s.namePosition) namePosition = s.namePosition;
+        }
+      } catch {}
+
       supabase.functions.invoke("send-certificate", {
         body: {
           attendeeId,
@@ -118,6 +133,9 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
           eventDate: eventData?.event_date || null,
           eventLocation: location || null,
           certificateId: certId,
+          certMode,
+          customTemplateUrl,
+          namePosition,
         },
       }).then(({ error: certError }) => {
         if (certError) {
