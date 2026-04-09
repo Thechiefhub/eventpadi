@@ -15,18 +15,23 @@
  * Real-time: All stats update live across all logged-in team members via WebSockets.
  */
 
-import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award } from "lucide-react";
+import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award, Trash2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useEventSelect } from "@/hooks/useEventSelect";
 import { useAttendees } from "@/hooks/useAttendees";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { useState } from "react";
 import DDayDashboard from "@/components/dday/DDayDashboard";
 import CheckInInterface from "@/components/dday/CheckInInterface";
 import AttendeeUpload from "@/components/dday/AttendeeUpload";
 import TeamManager from "@/components/dday/TeamManager";
 import BadgeGenerator from "@/components/dday/BadgeGenerator";
 import CertificateSettings from "@/components/dday/CertificateSettings";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function DDayModule() {
   const { user } = useAuth();
