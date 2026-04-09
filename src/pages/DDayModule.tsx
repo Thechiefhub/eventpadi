@@ -104,7 +104,7 @@ export default function DDayModule() {
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-4">
-          <DDayDashboard attendees={attendees} isAdmin={isAdmin} />
+          <DDayDashboard attendees={attendees} isAdmin={isAdmin} onCheckIn={checkIn} onUndoCheckIn={undoCheckIn} />
         </TabsContent>
 
         <TabsContent value="checkin" className="mt-4">
