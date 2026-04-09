@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { Search, Download, Award, Loader2, ArrowLeft } from "lucide-react";
+import { Search, Download, Award, Loader2, ArrowLeft, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 interface LookupResult {
   attendee: {
+    id: string;
     name: string;
+    email: string | null;
     role: string | null;
     ticket_id: string;
     checked_in: boolean;
@@ -28,6 +31,9 @@ export default function CertificateLookup() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LookupResult | null>(null);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [sendingCert, setSendingCert] = useState(false);
+  const [certSent, setCertSent] = useState(false);
 
   const handleLookup = async () => {
     const cleaned = ticketId.trim();
@@ -37,6 +43,8 @@ export default function CertificateLookup() {
     }
     setError("");
     setResult(null);
+    setCertSent(false);
+    setEmail("");
     setLoading(true);
 
     try {
@@ -50,11 +58,63 @@ export default function CertificateLookup() {
         setError(data.error);
       } else {
         setResult(data);
+        if (data?.attendee?.email) {
+          setEmail(data.attendee.email);
+        }
       }
     } catch {
       setError("Network error. Please check your connection.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendCertificate = async () => {
+    if (!result || !email.trim()) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setSendingCert(true);
+    try {
+      const certId = `CERT-${result.attendee.id.slice(0, 8).toUpperCase()}-${Date.now()}`;
+      const { data, error: certError } = await supabase.functions.invoke("send-certificate", {
+        body: {
+          attendeeId: result.attendee.id,
+          attendeeName: result.attendee.name,
+          attendeeEmail: email.trim(),
+          eventName: result.event?.name || "Event",
+          eventDate: result.event?.date || null,
+          eventLocation: result.event?.location || null,
+          certificateId: certId,
+          certMode: "auto",
+        },
+      });
+
+      if (certError) {
+        toast.error("Failed to generate certificate. Please try again.");
+      } else if (data?.certificateUrl) {
+        setCertSent(true);
+        setResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                attendee: {
+                  ...prev.attendee,
+                  certificate_url: data.certificateUrl,
+                  certificate_sent_at: new Date().toISOString(),
+                },
+              }
+            : prev
+        );
+        toast.success("Certificate generated and sent to your email!");
+      }
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSendingCert(false);
     }
   };
 
@@ -85,7 +145,7 @@ export default function CertificateLookup() {
               Your Certificate
             </h2>
             <p className="text-sm text-muted-foreground">
-              Enter your ticket ID to download your event certificate.
+              Enter your ticket ID to get your event certificate.
               You can find it on your badge or registration confirmation.
             </p>
           </div>
@@ -159,7 +219,7 @@ export default function CertificateLookup() {
                   </p>
                 </div>
 
-                {/* Certificate download or status */}
+                {/* Certificate download or generate */}
                 {result.attendee.certificate_url ? (
                   <a
                     href={result.attendee.certificate_url}
@@ -172,14 +232,39 @@ export default function CertificateLookup() {
                     </Button>
                   </a>
                 ) : result.attendee.checked_in ? (
-                  <Card className="border-accent/30 bg-accent/5">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        You've been checked in! Your certificate is being generated.
-                        Please check back shortly.
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground text-center">
+                      Enter your email to receive your certificate:
+                    </p>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendCertificate()}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSendCertificate}
+                      disabled={sendingCert || !email.trim()}
+                      className="w-full gradient-sunset text-primary-foreground"
+                      size="lg"
+                    >
+                      {sendingCert ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating…</>
+                      ) : (
+                        <><Send className="h-4 w-4 mr-2" /> Generate & Send Certificate</>
+                      )}
+                    </Button>
+                    {certSent && (
+                      <p className="text-xs text-center text-[hsl(var(--earth-green))]">
+                        ✓ Certificate sent! Check your email or click download above.
                       </p>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 ) : (
                   <Card className="border-border bg-muted/50">
                     <CardContent className="p-4 text-center">

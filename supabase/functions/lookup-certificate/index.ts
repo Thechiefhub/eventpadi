@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Look up attendee by ticket_id
     const { data: attendee, error } = await supabase
       .from("attendees")
       .select("id, name, email, role, ticket_id, checked_in, certificate_url, certificate_sent_at, event_id")
@@ -46,7 +45,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch event name for display
     const { data: event } = await supabase
       .from("events")
       .select("name, event_date, city, country")
@@ -56,7 +54,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         attendee: {
+          id: attendee.id,
           name: attendee.name,
+          email: attendee.email,
           role: attendee.role,
           ticket_id: attendee.ticket_id,
           checked_in: attendee.checked_in,
