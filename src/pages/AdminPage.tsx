@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { Navigate } from "react-router-dom";
 
 // Hardcoded admin email — only this account can access the admin page
-const ADMIN_EMAIL = "";
+const ADMIN_EMAIL = "chieftolulope@gmail.com";
 
 interface UserRow {
   user_id: string;
