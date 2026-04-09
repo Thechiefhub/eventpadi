@@ -6,13 +6,16 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { Attendee } from "@/hooks/useAttendees";
 import { format } from "date-fns";
 import AttendeeListModal, { type AttendeeFilter } from "./AttendeeListModal";
+import DashboardCheckIn from "./DashboardCheckIn";
 
 interface Props {
   attendees: Attendee[];
   isAdmin?: boolean;
+  onCheckIn?: (id: string) => Promise<boolean>;
+  onUndoCheckIn?: (id: string) => Promise<void>;
 }
 
-export default function DDayDashboard({ attendees, isAdmin = false }: Props) {
+export default function DDayDashboard({ attendees, isAdmin = false, onCheckIn, onUndoCheckIn }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalFilter, setModalFilter] = useState<AttendeeFilter>("all");
   const [modalTitle, setModalTitle] = useState("");
