@@ -164,7 +164,10 @@ export default function DDayModule() {
         <TabsContent value="certificates" className="mt-4">
           <CertificateSettings
             eventId={selectedEventId}
-            eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
+            eventName={selectedEvent?.name || ""}
+            eventDate={selectedEvent?.event_date}
+            eventLocation={[selectedEvent?.city, selectedEvent?.country].filter(Boolean).join(", ") || null}
+            attendees={attendees}
           />
         </TabsContent>
 
