@@ -1,24 +1,29 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Award, Upload, Image, Move, Loader2, Eye } from "lucide-react";
+import { Award, Upload, Image, Move, Loader2, Eye, Send, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
   eventId: string;
   eventName: string;
+  eventDate?: string | null;
+  eventLocation?: string | null;
+  attendees?: Attendee[];
 }
 
 interface NamePosition {
-  x: number; // percentage 0-100
-  y: number; // percentage 0-100
+  x: number;
+  y: number;
 }
 
-export default function CertificateSettings({ eventId, eventName }: Props) {
+export default function CertificateSettings({ eventId, eventName, eventDate, eventLocation, attendees = [] }: Props) {
   const [mode, setMode] = useState<"auto" | "custom">("auto");
   const [templateUrl, setTemplateUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -27,7 +32,13 @@ export default function CertificateSettings({ eventId, eventName }: Props) {
   const imgRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState(false);
 
-  // Load saved settings from localStorage (per event)
+  // Bulk send state
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ sent: 0, total: 0 });
+
+  const checkedInWithEmail = attendees.filter((a) => a.checked_in && a.email && !a.certificate_sent_at);
+  const alreadySent = attendees.filter((a) => a.certificate_sent_at);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`cert_settings_${eventId}`);
@@ -100,6 +111,59 @@ export default function CertificateSettings({ eventId, eventName }: Props) {
       window.removeEventListener("touchend", stop);
     };
   }, []);
+
+  const handleBulkSend = async () => {
+    if (checkedInWithEmail.length === 0) {
+      toast.info("No checked-in attendees with email pending certificates.");
+      return;
+    }
+
+    setBulkSending(true);
+    setBulkProgress({ sent: 0, total: checkedInWithEmail.length });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const attendee of checkedInWithEmail) {
+      try {
+        const certId = `CERT-${attendee.id.slice(0, 8).toUpperCase()}-${Date.now()}`;
+        const { error } = await supabase.functions.invoke("send-certificate", {
+          body: {
+            attendeeId: attendee.id,
+            attendeeName: attendee.name,
+            attendeeEmail: attendee.email,
+            eventName,
+            eventDate: eventDate || null,
+            eventLocation: eventLocation || null,
+            certificateId: certId,
+            certMode: mode,
+            customTemplateUrl: mode === "custom" ? templateUrl : null,
+            namePosition: mode === "custom" ? namePosition : undefined,
+          },
+        });
+
+        if (error) {
+          failCount++;
+        } else {
+          successCount++;
+        }
+      } catch {
+        failCount++;
+      }
+
+      setBulkProgress((prev) => ({ ...prev, sent: prev.sent + 1 }));
+
+      // Small delay to avoid rate limiting
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    setBulkSending(false);
+    if (failCount === 0) {
+      toast.success(`All ${successCount} certificates sent successfully!`);
+    } else {
+      toast.warning(`${successCount} sent, ${failCount} failed. You can retry for the remaining.`);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -186,7 +250,6 @@ export default function CertificateSettings({ eventId, eventName }: Props) {
                     </Button>
                   </div>
 
-                  {/* Template preview with draggable name */}
                   <div
                     ref={imgRef}
                     className="relative border border-border rounded-lg overflow-hidden cursor-crosshair select-none"
@@ -199,7 +262,6 @@ export default function CertificateSettings({ eventId, eventName }: Props) {
                       className="w-full h-auto"
                       draggable={false}
                     />
-                    {/* Draggable name indicator */}
                     <div
                       className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
                       style={{ left: `${namePosition.x}%`, top: `${namePosition.y}%` }}
@@ -242,6 +304,79 @@ export default function CertificateSettings({ eventId, eventName }: Props) {
           <Button onClick={saveSettings} className="w-full gradient-sunset text-primary-foreground">
             {saved ? "✓ Saved" : "Save Certificate Settings"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Bulk Certificate Generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-display flex items-center gap-2">
+            <Send className="h-5 w-5 text-primary" />
+            Bulk Certificate Generation
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-muted rounded-lg p-3">
+              <p className="text-lg font-display font-bold text-foreground">
+                {attendees.filter((a) => a.checked_in).length}
+              </p>
+              <p className="text-xs text-muted-foreground">Checked In</p>
+            </div>
+            <div className="bg-muted rounded-lg p-3">
+              <p className="text-lg font-display font-bold text-[hsl(var(--earth-green))]">
+                {alreadySent.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Certs Sent</p>
+            </div>
+            <div className="bg-muted rounded-lg p-3">
+              <p className="text-lg font-display font-bold text-primary">
+                {checkedInWithEmail.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </div>
+          </div>
+
+          {checkedInWithEmail.length === 0 && !bulkSending ? (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              {attendees.filter((a) => a.checked_in).length === 0
+                ? "No attendees have been checked in yet."
+                : alreadySent.length > 0
+                ? "All checked-in attendees with emails have received their certificates."
+                : "No checked-in attendees have email addresses. Certificates require email."}
+            </p>
+          ) : null}
+
+          {bulkSending && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Sending certificates…</span>
+                <span>{bulkProgress.sent}/{bulkProgress.total}</span>
+              </div>
+              <Progress
+                value={bulkProgress.total > 0 ? (bulkProgress.sent / bulkProgress.total) * 100 : 0}
+                className="h-2"
+              />
+            </div>
+          )}
+
+          <Button
+            onClick={handleBulkSend}
+            disabled={bulkSending || checkedInWithEmail.length === 0}
+            className="w-full gradient-sunset text-primary-foreground"
+            size="lg"
+          >
+            {bulkSending ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending {bulkProgress.sent}/{bulkProgress.total}…</>
+            ) : (
+              <><Users className="h-4 w-4 mr-2" /> Send Certificates to {checkedInWithEmail.length} Attendee(s)</>
+            )}
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            Certificates will be generated using the {mode === "custom" ? "custom template" : "auto-generated design"} and emailed to each attendee.
+          </p>
         </CardContent>
       </Card>
     </div>
