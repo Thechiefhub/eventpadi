@@ -15,18 +15,23 @@
  * Real-time: All stats update live across all logged-in team members via WebSockets.
  */
 
-import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award } from "lucide-react";
+import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award, Trash2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useEventSelect } from "@/hooks/useEventSelect";
 import { useAttendees } from "@/hooks/useAttendees";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { useState } from "react";
 import DDayDashboard from "@/components/dday/DDayDashboard";
 import CheckInInterface from "@/components/dday/CheckInInterface";
 import AttendeeUpload from "@/components/dday/AttendeeUpload";
 import TeamManager from "@/components/dday/TeamManager";
 import BadgeGenerator from "@/components/dday/BadgeGenerator";
 import CertificateSettings from "@/components/dday/CertificateSettings";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function DDayModule() {
   const { user } = useAuth();
@@ -34,8 +39,24 @@ export default function DDayModule() {
   const selectedEvent = events.find((e) => e.id === selectedEventId);
   const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId, selectedEvent ? { name: selectedEvent.name, event_date: selectedEvent.event_date, city: selectedEvent.city, country: selectedEvent.country } : undefined);
 
-  // Event owner is always admin; could extend with team role check in the future
+  // Event owner is always admin
   const isAdmin = !!user && events.some((e) => e.id === selectedEventId);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+    setDeletingId(eventId);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", eventId);
+      if (error) throw error;
+      toast.success(`"${eventName}" deleted.`);
+      // If we deleted the selected event, the hook will auto-select another
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete event.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (eventsLoading) {
     return (
@@ -63,7 +84,7 @@ export default function DDayModule() {
           <CalendarCheck className="h-6 w-6 text-primary" />
           <h1 className="text-xl md:text-2xl font-display font-bold text-foreground">The D‑Day</h1>
         </div>
-        {events.length > 1 && (
+        <div className="flex items-center gap-2 flex-1 sm:flex-initial">
           <Select value={selectedEventId} onValueChange={setSelectedEventId}>
             <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Select event" />
@@ -74,10 +95,27 @@ export default function DDayModule() {
               ))}
             </SelectContent>
           </Select>
-        )}
-        {events.length === 1 && (
-          <span className="text-sm text-muted-foreground">{events[0].name}</span>
-        )}
+
+          {isAdmin && selectedEvent && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0">
+                  {deletingId === selectedEventId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete "{selectedEvent.name}"?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently remove this event and all its attendees, team members, and related data. This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -126,7 +164,10 @@ export default function DDayModule() {
         <TabsContent value="certificates" className="mt-4">
           <CertificateSettings
             eventId={selectedEventId}
-            eventName={events.find((e) => e.id === selectedEventId)?.name || ""}
+            eventName={selectedEvent?.name || ""}
+            eventDate={selectedEvent?.event_date}
+            eventLocation={[selectedEvent?.city, selectedEvent?.country].filter(Boolean).join(", ") || null}
+            attendees={attendees}
           />
         </TabsContent>
 
