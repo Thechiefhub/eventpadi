@@ -39,8 +39,24 @@ export default function DDayModule() {
   const selectedEvent = events.find((e) => e.id === selectedEventId);
   const { attendees, loading: attendeesLoading, fetchAttendees, checkIn, undoCheckIn, generateMissingTicketIds } = useAttendees(selectedEventId, selectedEvent ? { name: selectedEvent.name, event_date: selectedEvent.event_date, city: selectedEvent.city, country: selectedEvent.country } : undefined);
 
-  // Event owner is always admin; could extend with team role check in the future
+  // Event owner is always admin
   const isAdmin = !!user && events.some((e) => e.id === selectedEventId);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+    setDeletingId(eventId);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", eventId);
+      if (error) throw error;
+      toast.success(`"${eventName}" deleted.`);
+      // If we deleted the selected event, the hook will auto-select another
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete event.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (eventsLoading) {
     return (
