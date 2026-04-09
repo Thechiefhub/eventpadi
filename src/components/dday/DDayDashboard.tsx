@@ -84,6 +84,11 @@ export default function DDayDashboard({ attendees, isAdmin = false, onCheckIn, o
         ))}
       </div>
 
+      {/* Quick Check-In Search */}
+      {onCheckIn && onUndoCheckIn && (
+        <DashboardCheckIn attendees={attendees} onCheckIn={onCheckIn} onUndoCheckIn={onUndoCheckIn} />
+      )}
+
       {/* Progress Bar */}
       <Card>
         <CardContent className="p-4 space-y-2">
