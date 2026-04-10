@@ -1,10 +1,8 @@
 /**
- * send-team-invite — Edge function that sends an HTML invitation email
- * to a team member using the Lovable AI gateway (no external email API key needed).
+ * send-team-invite — Sends an HTML invitation email with event stats
+ * to a team member using Supabase Auth admin API.
  *
  * Expects JSON body: { inviteId: string }
- * Reads the invite from event_team_members, builds the email, and sends via Supabase's
- * built-in email or a simple SMTP relay.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
@@ -33,7 +31,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Also create a client with the user's token to verify identity
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -54,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch the invite
+    // Fetch the invite with event details
     const { data: invite, error: inviteError } = await supabase
       .from("event_team_members")
       .select("*, events(name, event_date, city, country)")
@@ -68,13 +65,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify the requester is the one who invited
     if (invite.invited_by !== user.id) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Fetch attendee stats for the event
+    const { data: attendeeData } = await supabase
+      .from("attendees")
+      .select("id, checked_in")
+      .eq("event_id", invite.event_id);
+
+    const totalAttendees = attendeeData?.length || 0;
+    const checkedInCount = attendeeData?.filter((a: any) => a.checked_in).length || 0;
+    const remainingCount = totalAttendees - checkedInCount;
 
     const siteUrl = req.headers.get("origin") || "https://eventpadi.lovable.app";
     const acceptUrl = `${siteUrl}/invite/${invite.invitation_token}`;
@@ -83,7 +89,6 @@ Deno.serve(async (req) => {
     const eventLocation = [invite.events?.city, invite.events?.country].filter(Boolean).join(", ");
     const roleName = invite.role === "admin" ? "Admin" : "Registration Staff";
 
-    // Build HTML email
     const html = `
 <!DOCTYPE html>
 <html>
@@ -104,19 +109,38 @@ Deno.serve(async (req) => {
             You've been invited to join <strong style="color:#1a2040;">${eventName}</strong> as <strong style="color:#f97316;">${roleName}</strong>.
           </p>
           ${eventDate || eventLocation ? `
-          <table style="background:#f8f5f1;border-radius:8px;padding:16px;width:100%;margin-bottom:20px;" cellpadding="0" cellspacing="0">
+          <table style="background:#f8f5f1;border-radius:8px;width:100%;margin-bottom:20px;" cellpadding="0" cellspacing="0">
             <tr><td style="padding:12px 16px;">
               ${eventDate ? `<p style="color:#55575d;font-size:13px;margin:0 0 4px;">📅 <strong>Date:</strong> ${eventDate}</p>` : ""}
               ${eventLocation ? `<p style="color:#55575d;font-size:13px;margin:0;">📍 <strong>Location:</strong> ${eventLocation}</p>` : ""}
             </td></tr>
           </table>` : ""}
+
+          <!-- Event Stats -->
+          <table style="width:100%;margin-bottom:20px;border-collapse:collapse;" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="width:33%;text-align:center;padding:12px 8px;background:#f0f9ff;border-radius:8px 0 0 8px;">
+                <p style="color:#1a2040;font-size:22px;font-weight:700;margin:0;">${totalAttendees}</p>
+                <p style="color:#888;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Registered</p>
+              </td>
+              <td style="width:33%;text-align:center;padding:12px 8px;background:#f0fdf4;">
+                <p style="color:#16a34a;font-size:22px;font-weight:700;margin:0;">${checkedInCount}</p>
+                <p style="color:#888;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Checked In</p>
+              </td>
+              <td style="width:33%;text-align:center;padding:12px 8px;background:#fff7ed;border-radius:0 8px 8px 0;">
+                <p style="color:#ea580c;font-size:22px;font-weight:700;margin:0;">${remainingCount}</p>
+                <p style="color:#888;font-size:11px;margin:4px 0 0;text-transform:uppercase;">Remaining</p>
+              </td>
+            </tr>
+          </table>
+
           <p style="color:#55575d;font-size:14px;line-height:1.6;margin:0 0 8px;">
             ${invite.role === "admin"
               ? "As an Admin, you'll have full access to upload attendees, manage check-ins, export data, and manage the team."
-              : "As Registration Staff, you'll be able to check in attendees at the event."}
+              : "As Registration Staff, you'll be able to check in attendees at the event. You'll see real-time stats and the full attendee list."}
           </p>
           <p style="color:#55575d;font-size:14px;line-height:1.6;margin:0 0 24px;">
-            Click the button below to accept the invitation. You'll be asked to log in or create an account first.
+            Click the button below to accept the invitation and start working.
           </p>
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr><td align="center">
@@ -139,10 +163,6 @@ Deno.serve(async (req) => {
 </body>
 </html>`;
 
-    const plainText = `You've been invited to join "${eventName}" as ${roleName}.\n\nAccept your invitation: ${acceptUrl}\n\nThis link expires in 7 days.`;
-
-    // Send email via Supabase Auth admin API (inviteUserByEmail)
-    // This sends a proper email through the configured email provider
     const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(
       invite.invited_email,
       {
@@ -155,21 +175,18 @@ Deno.serve(async (req) => {
       }
     );
 
-    // If inviteUserByEmail fails (user may already exist), we'll use a fallback approach
     if (emailError) {
-      console.log("inviteUserByEmail note:", emailError.message, "- this is expected if user already exists");
-      // For existing users, we still want to notify them. 
-      // Store the invite URL — the frontend will show a "link copied" option as fallback.
+      console.log("inviteUserByEmail note:", emailError.message);
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         acceptUrl,
         emailSent: !emailError,
-        message: emailError 
-          ? "Invitation created! Share this link with the team member." 
-          : "Invitation email sent successfully!"
+        message: emailError
+          ? "Invitation created! Share this link with the team member."
+          : "Invitation email sent successfully!",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
