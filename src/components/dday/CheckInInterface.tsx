@@ -246,6 +246,7 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
 
       {/* Attendee List Header */}
       {!isSearching && attendees.length > 0 && (
+        <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground font-medium">
             All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span>
           </p>
