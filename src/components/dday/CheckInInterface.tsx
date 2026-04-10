@@ -41,22 +41,22 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
   };
 
   const searchResults = isSearching
-    ? attendees.filter(
+    ? applyFilters(attendees.filter(
         (a) =>
           a.name.toLowerCase().includes(query.toLowerCase()) ||
           (a.email && a.email.toLowerCase().includes(query.toLowerCase())) ||
           (a.phone && a.phone.includes(query)) ||
           (a.ticket_id && a.ticket_id.toLowerCase().includes(query.toLowerCase()))
-      )
+      ))
     : [];
 
   // Sort: unchecked first, then by name
   const sortedAttendees = useMemo(() => {
-    return [...attendees].sort((a, b) => {
+    return applyFilters([...attendees]).sort((a, b) => {
       if (a.checked_in !== b.checked_in) return a.checked_in ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
-  }, [attendees]);
+  }, [attendees, statusFilter, roleFilter]);
 
   const displayList = isSearching ? searchResults : sortedAttendees.slice(0, visibleCount);
   const hasMore = !isSearching && visibleCount < sortedAttendees.length;
