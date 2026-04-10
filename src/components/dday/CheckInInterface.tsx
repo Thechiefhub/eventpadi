@@ -19,10 +19,26 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
   const [lastCheckedIn, setLastCheckedIn] = useState<Attendee | null>(null);
   const [showAll, setShowAll] = useState(true);
   const [visibleCount, setVisibleCount] = useState(30);
+  const [statusFilter, setStatusFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const scannerRef = useRef<any>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
 
+  // Get unique roles
+  const uniqueRoles = useMemo(() => {
+    const roles = new Set(attendees.map((a) => a.role || "attendee"));
+    return Array.from(roles).sort();
+  }, [attendees]);
+
   const isSearching = query.trim().length >= 2;
+
+  const applyFilters = (list: Attendee[]) => {
+    let filtered = list;
+    if (statusFilter === "checked_in") filtered = filtered.filter((a) => a.checked_in);
+    if (statusFilter === "not_checked_in") filtered = filtered.filter((a) => !a.checked_in);
+    if (roleFilter !== "all") filtered = filtered.filter((a) => (a.role || "attendee") === roleFilter);
+    return filtered;
+  };
 
   const searchResults = isSearching
     ? attendees.filter(
