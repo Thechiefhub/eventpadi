@@ -209,9 +209,43 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
         </div>
       )}
 
+      {/* Filters */}
+      {attendees.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="not_checked_in">Not Checked In</SelectItem>
+              <SelectItem value="checked_in">Checked In</SelectItem>
+            </SelectContent>
+          </Select>
+          {uniqueRoles.length > 1 && (
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {uniqueRoles.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {(statusFilter !== "all" || roleFilter !== "all") && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setStatusFilter("all"); setRoleFilter("all"); }}>
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Attendee List Header */}
       {!isSearching && attendees.length > 0 && (
-        <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground font-medium">
             All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span>
           </p>
