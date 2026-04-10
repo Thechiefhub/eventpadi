@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, QrCode, UserCheck, Undo2, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, QrCode, UserCheck, Undo2, X, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
