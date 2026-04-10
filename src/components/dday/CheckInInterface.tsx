@@ -248,7 +248,10 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
       {!isSearching && attendees.length > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground font-medium">
-            All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span>
+            {sortedAttendees.length === attendees.length
+              ? <>All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span></>
+              : <>{sortedAttendees.length} of {attendees.length} attendees (filtered)</>
+            }
           </p>
           <Button variant="ghost" size="sm" onClick={() => setShowAll(!showAll)} className="text-xs">
             {showAll ? <><ChevronUp className="h-3 w-3 mr-1" /> Collapse</> : <><ChevronDown className="h-3 w-3 mr-1" /> Expand</>}
