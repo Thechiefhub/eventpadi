@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, QrCode, UserCheck, Undo2, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, QrCode, UserCheck, Undo2, X, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
@@ -18,28 +19,44 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
   const [lastCheckedIn, setLastCheckedIn] = useState<Attendee | null>(null);
   const [showAll, setShowAll] = useState(true);
   const [visibleCount, setVisibleCount] = useState(30);
+  const [statusFilter, setStatusFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const scannerRef = useRef<any>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
 
+  // Get unique roles
+  const uniqueRoles = useMemo(() => {
+    const roles = new Set(attendees.map((a) => a.role || "attendee"));
+    return Array.from(roles).sort();
+  }, [attendees]);
+
   const isSearching = query.trim().length >= 2;
 
+  const applyFilters = (list: Attendee[]) => {
+    let filtered = list;
+    if (statusFilter === "checked_in") filtered = filtered.filter((a) => a.checked_in);
+    if (statusFilter === "not_checked_in") filtered = filtered.filter((a) => !a.checked_in);
+    if (roleFilter !== "all") filtered = filtered.filter((a) => (a.role || "attendee") === roleFilter);
+    return filtered;
+  };
+
   const searchResults = isSearching
-    ? attendees.filter(
+    ? applyFilters(attendees.filter(
         (a) =>
           a.name.toLowerCase().includes(query.toLowerCase()) ||
           (a.email && a.email.toLowerCase().includes(query.toLowerCase())) ||
           (a.phone && a.phone.includes(query)) ||
           (a.ticket_id && a.ticket_id.toLowerCase().includes(query.toLowerCase()))
-      )
+      ))
     : [];
 
   // Sort: unchecked first, then by name
   const sortedAttendees = useMemo(() => {
-    return [...attendees].sort((a, b) => {
+    return applyFilters([...attendees]).sort((a, b) => {
       if (a.checked_in !== b.checked_in) return a.checked_in ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
-  }, [attendees]);
+  }, [attendees, statusFilter, roleFilter]);
 
   const displayList = isSearching ? searchResults : sortedAttendees.slice(0, visibleCount);
   const hasMore = !isSearching && visibleCount < sortedAttendees.length;
@@ -192,11 +209,49 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
         </div>
       )}
 
+      {/* Filters */}
+      {attendees.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="not_checked_in">Not Checked In</SelectItem>
+              <SelectItem value="checked_in">Checked In</SelectItem>
+            </SelectContent>
+          </Select>
+          {uniqueRoles.length > 1 && (
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {uniqueRoles.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {(statusFilter !== "all" || roleFilter !== "all") && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setStatusFilter("all"); setRoleFilter("all"); }}>
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Attendee List Header */}
       {!isSearching && attendees.length > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground font-medium">
-            All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span>
+            {sortedAttendees.length === attendees.length
+              ? <>All Attendees ({attendees.length}) · <span className="text-[hsl(var(--earth-green))]">{checkedInCount} checked in</span></>
+              : <>{sortedAttendees.length} of {attendees.length} attendees (filtered)</>
+            }
           </p>
           <Button variant="ghost" size="sm" onClick={() => setShowAll(!showAll)} className="text-xs">
             {showAll ? <><ChevronUp className="h-3 w-3 mr-1" /> Collapse</> : <><ChevronDown className="h-3 w-3 mr-1" /> Expand</>}

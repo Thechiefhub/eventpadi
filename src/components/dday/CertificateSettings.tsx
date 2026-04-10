@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Award, Upload, Image, Move, Loader2, Eye, Send, Users } from "lucide-react";
+import { Award, Upload, Image, Move, Loader2, Eye, Send, Users, Type, ZoomIn } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Attendee } from "@/hooks/useAttendees";
@@ -23,14 +26,23 @@ interface NamePosition {
   y: number;
 }
 
+interface NameStyle {
+  fontSize: number;
+  color: string;
+  fontWeight: string;
+}
+
 export default function CertificateSettings({ eventId, eventName, eventDate, eventLocation, attendees = [] }: Props) {
   const [mode, setMode] = useState<"auto" | "custom">("auto");
   const [templateUrl, setTemplateUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [namePosition, setNamePosition] = useState<NamePosition>({ x: 50, y: 50 });
+  const [nameStyle, setNameStyle] = useState<NameStyle>({ fontSize: 28, color: "#1a2040", fontWeight: "bold" });
   const [dragging, setDragging] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewName, setPreviewName] = useState("John Doe");
 
   // Bulk send state
   const [bulkSending, setBulkSending] = useState(false);
@@ -47,17 +59,18 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
         if (s.mode) setMode(s.mode);
         if (s.templateUrl) setTemplateUrl(s.templateUrl);
         if (s.namePosition) setNamePosition(s.namePosition);
+        if (s.nameStyle) setNameStyle(s.nameStyle);
       }
     } catch {}
   }, [eventId]);
 
   const saveSettings = useCallback(() => {
-    const settings = { mode, templateUrl, namePosition };
+    const settings = { mode, templateUrl, namePosition, nameStyle };
     localStorage.setItem(`cert_settings_${eventId}`, JSON.stringify(settings));
     setSaved(true);
     toast.success("Certificate settings saved");
     setTimeout(() => setSaved(false), 2000);
-  }, [mode, templateUrl, namePosition, eventId]);
+  }, [mode, templateUrl, namePosition, nameStyle, eventId]);
 
   const handleTemplateUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -139,6 +152,7 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
             certMode: mode,
             customTemplateUrl: mode === "custom" ? templateUrl : null,
             namePosition: mode === "custom" ? namePosition : undefined,
+            nameStyle: mode === "custom" ? nameStyle : undefined,
           },
         });
 
@@ -152,8 +166,6 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
       }
 
       setBulkProgress((prev) => ({ ...prev, sent: prev.sent + 1 }));
-
-      // Small delay to avoid rate limiting
       await new Promise((r) => setTimeout(r, 300));
     }
 
@@ -197,7 +209,7 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
                   Custom Template
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Upload your own certificate design (PNG/JPG). Drag to position where the attendee name appears.
+                  Upload your own certificate design. Position the name text box exactly where you want it on the template.
                 </p>
               </div>
               <Badge variant="outline" className="shrink-0">Custom</Badge>
@@ -232,11 +244,11 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-foreground flex items-center gap-1">
                       <Move className="h-4 w-4 text-primary" />
-                      Drag the name label to position it
+                      Drag the name box to position it
                     </p>
                     <Button
                       variant="outline"
@@ -250,6 +262,7 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
                     </Button>
                   </div>
 
+                  {/* Template with draggable name text box */}
                   <div
                     ref={imgRef}
                     className="relative border border-border rounded-lg overflow-hidden cursor-crosshair select-none"
@@ -262,16 +275,71 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
                       className="w-full h-auto"
                       draggable={false}
                     />
+                    {/* Draggable name text box */}
                     <div
                       className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
                       style={{ left: `${namePosition.x}%`, top: `${namePosition.y}%` }}
                       onMouseDown={handleDragStart}
                       onTouchStart={handleDragStart}
                     >
-                      <div className="bg-primary/90 text-primary-foreground px-4 py-2 rounded-md shadow-lg cursor-grab active:cursor-grabbing whitespace-nowrap">
-                        <p className="text-sm font-bold">Attendee Name</p>
-                        <p className="text-[10px] opacity-80 text-center">← drag to reposition →</p>
+                      <div
+                        className="border-2 border-dashed border-primary bg-primary/10 px-6 py-3 rounded cursor-grab active:cursor-grabbing whitespace-nowrap backdrop-blur-sm"
+                        style={{
+                          fontSize: `${Math.max(10, nameStyle.fontSize * 0.5)}px`,
+                          color: nameStyle.color,
+                          fontWeight: nameStyle.fontWeight,
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Type className="h-3 w-3 text-primary shrink-0" />
+                          <span>Attendee Name Here</span>
+                        </div>
+                        <p className="text-[9px] text-primary text-center mt-0.5 font-normal">↕ drag to reposition ↔</p>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Name style controls */}
+                  <div className="bg-muted rounded-lg p-3 space-y-3">
+                    <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                      <Type className="h-3.5 w-3.5 text-primary" /> Name Text Style
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Font Size: {nameStyle.fontSize}px</Label>
+                        <Slider
+                          value={[nameStyle.fontSize]}
+                          onValueChange={([v]) => setNameStyle((s) => ({ ...s, fontSize: v }))}
+                          min={14}
+                          max={72}
+                          step={1}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Text Color</Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={nameStyle.color}
+                            onChange={(e) => setNameStyle((s) => ({ ...s, color: e.target.value }))}
+                            className="h-8 w-8 rounded border border-border cursor-pointer"
+                          />
+                          <span className="text-xs text-muted-foreground font-mono">{nameStyle.color}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {(["normal", "bold"] as const).map((w) => (
+                        <Button
+                          key={w}
+                          variant={nameStyle.fontWeight === w ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs flex-1"
+                          onClick={() => setNameStyle((s) => ({ ...s, fontWeight: w }))}
+                        >
+                          {w === "bold" ? "Bold" : "Regular"}
+                        </Button>
+                      ))}
                     </div>
                   </div>
 
@@ -285,21 +353,122 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
 
           {/* Auto-generated preview */}
           {mode === "auto" && (
-            <div className="border border-border rounded-lg p-4 bg-[hsl(30,25%,95%)]">
-              <div className="aspect-[1.414/1] border border-[hsl(var(--sunset-orange)/0.3)] rounded bg-[hsl(30,20%,97%)] flex flex-col items-center justify-center gap-2 text-center p-4">
-                <p className="text-[10px] uppercase tracking-widest text-[hsl(var(--sunset-orange))] font-bold">Certificate of Attendance</p>
-                <div className="w-16 h-[1px] bg-[hsl(var(--sunset-orange)/0.5)]" />
-                <p className="text-xs text-muted-foreground">This is to certify that</p>
-                <p className="text-sm font-bold text-foreground">John Doe</p>
-                <p className="text-xs text-muted-foreground">has attended</p>
-                <p className="text-xs font-semibold text-[hsl(var(--sunset-orange))]">{eventName}</p>
-                <p className="text-[9px] text-muted-foreground mt-2">CERT-XXXXXXXX</p>
+            <div className="space-y-3">
+              <div className="border border-border rounded-lg overflow-hidden bg-gradient-to-br from-[hsl(30,30%,97%)] to-[hsl(35,25%,93%)]">
+                <div className="aspect-[1.414/1] relative flex flex-col items-center justify-center gap-1.5 p-6 text-center">
+                  {/* Decorative border */}
+                  <div className="absolute inset-3 border-2 border-[hsl(var(--sunset-orange)/0.2)] rounded-sm" />
+                  <div className="absolute inset-4 border border-[hsl(var(--sunset-orange)/0.1)] rounded-sm" />
+
+                  {/* Corner accents */}
+                  <div className="absolute top-5 left-5 w-6 h-6 border-t-2 border-l-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                  <div className="absolute top-5 right-5 w-6 h-6 border-t-2 border-r-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                  <div className="absolute bottom-5 left-5 w-6 h-6 border-b-2 border-l-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                  <div className="absolute bottom-5 right-5 w-6 h-6 border-b-2 border-r-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+
+                  <Award className="h-6 w-6 text-[hsl(var(--sunset-orange))] mb-1" />
+                  <p className="text-[9px] uppercase tracking-[0.25em] text-[hsl(var(--sunset-orange))] font-bold">Certificate of Attendance</p>
+                  <div className="w-12 h-[1px] bg-[hsl(var(--sunset-orange)/0.4)] my-1" />
+                  <p className="text-[8px] text-muted-foreground">This is to certify that</p>
+                  <p className="text-sm font-bold text-foreground font-display">{previewName}</p>
+                  <p className="text-[8px] text-muted-foreground">has successfully attended</p>
+                  <p className="text-[10px] font-semibold text-[hsl(var(--sunset-orange))]">{eventName || "Event Name"}</p>
+                  {(eventDate || eventLocation) && (
+                    <p className="text-[7px] text-muted-foreground mt-0.5">
+                      {[eventDate, eventLocation].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                  <div className="mt-2 flex items-center gap-4">
+                    <div className="text-center">
+                      <div className="w-12 h-[1px] bg-muted-foreground/30" />
+                      <p className="text-[6px] text-muted-foreground mt-0.5">Organizer</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-[1px] bg-muted-foreground/30" />
+                      <p className="text-[6px] text-muted-foreground mt-0.5">Date</p>
+                    </div>
+                  </div>
+                  <p className="text-[7px] text-muted-foreground/60 mt-1 font-mono">CERT-XXXXXXXX</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-2 flex items-center justify-center gap-1">
-                <Eye className="h-3 w-3" /> Auto-generated design preview
+
+              {/* Preview name input */}
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Preview with a name…"
+                  value={previewName}
+                  onChange={(e) => setPreviewName(e.target.value)}
+                  className="text-sm"
+                />
+                <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+                  <ZoomIn className="h-4 w-4 mr-1" /> Full Preview
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+                <Eye className="h-3 w-3" /> Type a name above to preview how the certificate looks
               </p>
             </div>
           )}
+
+          {/* Full-size preview dialog */}
+          <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="font-display">Certificate Preview</DialogTitle>
+              </DialogHeader>
+              {mode === "auto" ? (
+                <div className="bg-gradient-to-br from-[hsl(30,30%,97%)] to-[hsl(35,25%,93%)] rounded-lg overflow-hidden">
+                  <div className="aspect-[1.414/1] relative flex flex-col items-center justify-center gap-3 p-10 text-center">
+                    <div className="absolute inset-5 border-2 border-[hsl(var(--sunset-orange)/0.2)] rounded" />
+                    <div className="absolute inset-7 border border-[hsl(var(--sunset-orange)/0.1)] rounded" />
+                    <div className="absolute top-8 left-8 w-8 h-8 border-t-2 border-l-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                    <div className="absolute top-8 right-8 w-8 h-8 border-t-2 border-r-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                    <div className="absolute bottom-8 left-8 w-8 h-8 border-b-2 border-l-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                    <div className="absolute bottom-8 right-8 w-8 h-8 border-b-2 border-r-2 border-[hsl(var(--sunset-orange)/0.5)]" />
+                    <Award className="h-10 w-10 text-[hsl(var(--sunset-orange))]" />
+                    <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--sunset-orange))] font-bold">Certificate of Attendance</p>
+                    <div className="w-20 h-[1px] bg-[hsl(var(--sunset-orange)/0.4)]" />
+                    <p className="text-sm text-muted-foreground">This is to certify that</p>
+                    <p className="text-2xl font-bold text-foreground font-display">{previewName}</p>
+                    <p className="text-sm text-muted-foreground">has successfully attended</p>
+                    <p className="text-base font-semibold text-[hsl(var(--sunset-orange))]">{eventName || "Event Name"}</p>
+                    {(eventDate || eventLocation) && (
+                      <p className="text-xs text-muted-foreground">{[eventDate, eventLocation].filter(Boolean).join(" · ")}</p>
+                    )}
+                    <div className="mt-4 flex items-center gap-8">
+                      <div className="text-center">
+                        <div className="w-20 h-[1px] bg-muted-foreground/30" />
+                        <p className="text-xs text-muted-foreground mt-1">Organizer</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-20 h-[1px] bg-muted-foreground/30" />
+                        <p className="text-xs text-muted-foreground mt-1">Date</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground/60 mt-2 font-mono">CERT-XXXXXXXX</p>
+                  </div>
+                </div>
+              ) : templateUrl ? (
+                <div className="relative rounded-lg overflow-hidden">
+                  <img src={templateUrl} alt="Certificate preview" className="w-full h-auto" />
+                  <div
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${namePosition.x}%`,
+                      top: `${namePosition.y}%`,
+                      fontSize: `${nameStyle.fontSize}px`,
+                      color: nameStyle.color,
+                      fontWeight: nameStyle.fontWeight,
+                    }}
+                  >
+                    {previewName}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No template uploaded yet</p>
+              )}
+            </DialogContent>
+          </Dialog>
 
           <Button onClick={saveSettings} className="w-full gradient-sunset text-primary-foreground">
             {saved ? "✓ Saved" : "Save Certificate Settings"}
@@ -316,7 +485,6 @@ export default function CertificateSettings({ eventId, eventName, eventDate, eve
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-muted rounded-lg p-3">
               <p className="text-lg font-display font-bold text-foreground">
