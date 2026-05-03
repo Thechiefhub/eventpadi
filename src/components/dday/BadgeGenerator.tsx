@@ -724,6 +724,65 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
         </DialogContent>
       </Dialog>
 
+      {/* Share message templates dialog */}
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">Customize Share Messages</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Use variables: <code className="bg-muted px-1 rounded">{`{{name}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{event}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{ticket}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{admits}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{role}}`}</code>
+            </p>
+
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email Subject</Label>
+              <Input
+                value={templates.emailSubject}
+                onChange={(e) => saveTemplates({ ...templates, emailSubject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm">Email Body</Label>
+              <Textarea
+                rows={6}
+                value={templates.emailBody}
+                onChange={(e) => saveTemplates({ ...templates, emailBody: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1 text-emerald-600"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp Message</Label>
+              <Textarea
+                rows={4}
+                value={templates.whatsappBody}
+                onChange={(e) => saveTemplates({ ...templates, whatsappBody: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1 text-pink-600"><Instagram className="h-3.5 w-3.5" /> Instagram Caption</Label>
+              <Textarea
+                rows={3}
+                value={templates.instagramCaption}
+                onChange={(e) => saveTemplates({ ...templates, instagramCaption: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => saveTemplates(DEFAULT_TEMPLATES)}>
+                Reset to defaults
+              </Button>
+              <Button className="flex-1 gradient-sunset text-primary-foreground" onClick={() => { toast.success("Templates saved"); setShowTemplates(false); }}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Hidden: single badge for print */}
       <div className="hidden">
         {selectedAttendee && (
