@@ -438,6 +438,22 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
               <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setShowTemplates(true)}>
+            <Settings2 className="h-4 w-4 mr-1" /> Templates
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShareAllEmails}
+            disabled={!!shareAllProgress}
+            className="text-primary"
+          >
+            {shareAllProgress ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {shareAllProgress.current}/{shareAllProgress.total}</>
+            ) : (
+              <><Send className="h-4 w-4 mr-1" /> Share All Badges</>
+            )}
+          </Button>
           <Button variant="outline" onClick={handleBulkDownload} disabled={!!bulkProgress}>
             {bulkProgress ? (
               <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {bulkProgress.current}/{bulkProgress.total}</>
@@ -450,6 +466,88 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           </Button>
         </div>
       </div>
+
+      {shareAllProgress && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="flex-1">
+              Sending badges… {shareAllProgress.current}/{shareAllProgress.total}
+              <span className="text-emerald-600 ml-2">✓ {shareAllProgress.sent}</span>
+              <span className="text-destructive ml-2">✗ {shareAllProgress.failed}</span>
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delivery status panel */}
+      <Card className="border-border">
+        <CardContent className="p-3">
+          <button
+            onClick={() => { setShowLog((v) => !v); if (!showLog) fetchLogs(); }}
+            className="flex items-center justify-between w-full text-sm font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" /> Email Delivery Status
+              {logs.length > 0 && (
+                <>
+                  <Badge variant="secondary" className="text-[10px]">{logs.filter((l) => l.status === "sent").length} sent</Badge>
+                  {logs.filter((l) => l.status === "failed").length > 0 && (
+                    <Badge variant="destructive" className="text-[10px]">{logs.filter((l) => l.status === "failed").length} failed</Badge>
+                  )}
+                </>
+              )}
+            </span>
+            {showLog ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          {showLog && (
+            <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
+              {logs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No badge emails sent yet.</p>
+              ) : (
+                logs.map((log) => {
+                  const att = attendees.find((x) => x.id === log.attendee_id);
+                  return (
+                    <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/40 text-xs">
+                      {log.status === "sent" ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : log.status === "failed" ? (
+                        <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {att?.name || "Unknown"} <span className="text-muted-foreground font-normal">· {log.recipient}</span>
+                        </p>
+                        <p className="text-muted-foreground truncate">
+                          {log.status === "failed" ? (
+                            <span className="text-destructive">{log.error || "Delivery failed"}</span>
+                          ) : (
+                            log.subject || `Sent · ${log.last_attempt_at ? new Date(log.last_attempt_at).toLocaleString() : ""}`
+                          )}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Attempts: {log.attempts}</p>
+                      </div>
+                      {log.status === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleRetry(log)}
+                          disabled={retrying === log.id}
+                        >
+                          {retrying === log.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><RefreshCw className="h-3 w-3 mr-1" /> Retry</>}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Certificate download link for attendees */}
       <CertificateLinkCard />
