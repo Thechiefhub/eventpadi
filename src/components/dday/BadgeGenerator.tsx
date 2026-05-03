@@ -1,13 +1,16 @@
 import { useRef, useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package } from "lucide-react";
 import { toPng } from "html-to-image";
+import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
@@ -50,9 +53,14 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
   const badgeCardRef = useRef<HTMLDivElement>(null);
+  const bulkRenderRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [editing, setEditing] = useState<Attendee | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", role: "", admits: "1", email: "", phone: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const handleDownloadPNG = useCallback(async () => {
     if (!badgeCardRef.current || !selectedAttendee) return;
@@ -70,6 +78,157 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
       setDownloading(false);
     }
   }, [selectedAttendee]);
+
+  // Bulk download all badges as ZIP of PNGs
+  const handleBulkDownload = useCallback(async () => {
+    if (attendees.length === 0) return;
+    setBulkProgress({ current: 0, total: attendees.length });
+    const zip = new JSZip();
+    const folder = zip.folder(eventName.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "badges")!;
+    try {
+      // Render each badge sequentially in the hidden bulk container
+      for (let i = 0; i < attendees.length; i++) {
+        const a = attendees[i];
+        const node = document.getElementById(`bulk-badge-${a.id}`);
+        if (!node) continue;
+        const dataUrl = await toPng(node, { pixelRatio: 3, backgroundColor: "#ffffff" });
+        const base64 = dataUrl.split(",")[1];
+        const safeName = a.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+        folder.file(`${safeName || "badge"}-${(a.ticket_id || a.id.slice(0, 6)).replace(/[^a-z0-9]+/gi, "")}.png`, base64, { base64: true });
+        setBulkProgress({ current: i + 1, total: attendees.length });
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `badges-${eventName.replace(/\s+/g, "-").toLowerCase() || "event"}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${attendees.length} badges`);
+    } catch (err: any) {
+      toast.error(`Bulk download failed: ${err.message || err}`);
+    } finally {
+      setBulkProgress(null);
+    }
+  }, [attendees, eventName]);
+
+  // Generate a PNG data URL for the currently selected badge
+  const renderBadgePngDataUrl = useCallback(async () => {
+    if (!badgeCardRef.current) return null;
+    return await toPng(badgeCardRef.current, { pixelRatio: 3, backgroundColor: "#ffffff" });
+  }, []);
+
+  // Share via Email (uses native share with file when supported, otherwise mailto)
+  const handleShareEmail = useCallback(async () => {
+    if (!selectedAttendee) return;
+    const a = selectedAttendee;
+    const subject = `Your badge for ${eventName}`;
+    const body = `Hi ${a.name},\n\nHere is your check-in badge for ${eventName}.\nTicket ID: ${a.ticket_id || a.id.slice(0, 12).toUpperCase()}\nAdmits: ${a.admits || 1}\n\nPlease present this QR code at the entrance.\n\nSee you there!`;
+    try {
+      const dataUrl = await renderBadgePngDataUrl();
+      if (dataUrl && (navigator as any).canShare) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+        if ((navigator as any).canShare({ files: [file] })) {
+          await (navigator as any).share({ files: [file], title: subject, text: body });
+          return;
+        }
+      }
+    } catch {}
+    if (a.email) {
+      window.location.href = `mailto:${a.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    } else {
+      toast.error("No email on file. Add one via Edit.");
+    }
+  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+
+  // Share via WhatsApp — opens wa.me with text; user can attach the downloaded PNG
+  const handleShareWhatsApp = useCallback(async () => {
+    if (!selectedAttendee) return;
+    const a = selectedAttendee;
+    const text = `Your badge for *${eventName}*%0ATicket ID: ${a.ticket_id || a.id.slice(0, 12).toUpperCase()}%0AAdmits: ${a.admits || 1}%0APresent the QR code at the entrance.`;
+    try {
+      const dataUrl = await renderBadgePngDataUrl();
+      if (dataUrl && (navigator as any).canShare) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+        if ((navigator as any).canShare({ files: [file] })) {
+          await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: text.replace(/%0A/g, "\n") });
+          return;
+        }
+      }
+    } catch {}
+    const phone = (a.phone || "").replace(/[^\d]/g, "");
+    const url = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, "_blank");
+  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+
+  // Share via Instagram — Instagram has no public share URL; use Web Share API or copy + open
+  const handleShareInstagram = useCallback(async () => {
+    if (!selectedAttendee) return;
+    const a = selectedAttendee;
+    try {
+      const dataUrl = await renderBadgePngDataUrl();
+      if (!dataUrl) return;
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: `${eventName} — ${a.ticket_id || ""}` });
+        return;
+      }
+      // Fallback: download the badge then open Instagram so user can post it
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `badge-${a.name}.png`;
+      link.click();
+      toast.success("Badge downloaded — opening Instagram to upload");
+      window.open("https://www.instagram.com/", "_blank");
+    } catch (err: any) {
+      toast.error(`Instagram share failed: ${err.message || err}`);
+    }
+  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+
+  // Open edit dialog
+  const openEdit = (a: Attendee) => {
+    setEditing(a);
+    setEditForm({
+      name: a.name,
+      role: a.role || "",
+      admits: String(a.admits || 1),
+      email: a.email || "",
+      phone: a.phone || "",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    if (!editForm.name.trim()) { toast.error("Name is required"); return; }
+    setSavingEdit(true);
+    const admitsVal = parseInt(editForm.admits, 10);
+    // NOTE: We intentionally do NOT update ticket_id — the QR code stays identical across edits.
+    const { error } = await supabase
+      .from("attendees")
+      .update({
+        name: editForm.name.trim(),
+        role: editForm.role.trim() || "attendee",
+        admits: isNaN(admitsVal) || admitsVal < 1 ? 1 : admitsVal,
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim() || null,
+      })
+      .eq("id", editing.id);
+    if (error) {
+      toast.error(`Failed to save: ${error.message}`);
+    } else {
+      toast.success("Attendee updated — QR code unchanged");
+      // If the edited attendee is currently selected in preview, refresh local view
+      if (selectedAttendee?.id === editing.id) {
+        setSelectedAttendee({ ...selectedAttendee, name: editForm.name.trim(), role: editForm.role.trim() || "attendee", admits: isNaN(admitsVal) || admitsVal < 1 ? 1 : admitsVal, email: editForm.email.trim() || null, phone: editForm.phone.trim() || null });
+      }
+      setEditing(null);
+    }
+    setSavingEdit(false);
+  };
+
   const missingCount = attendees.filter((a) => !a.ticket_id).length;
 
   const filtered = search.trim()
@@ -128,6 +287,13 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
               <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
             </Button>
           )}
+          <Button variant="outline" onClick={handleBulkDownload} disabled={!!bulkProgress}>
+            {bulkProgress ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {bulkProgress.current}/{bulkProgress.total}</>
+            ) : (
+              <><Package className="h-4 w-4 mr-1" /> Download All (ZIP)</>
+            )}
+          </Button>
           <Button onClick={handlePrintAll} className="gradient-sunset text-primary-foreground">
             <Printer className="h-4 w-4 mr-1" /> Print All Badges
           </Button>
@@ -177,6 +343,14 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                 Admit {a.admits || 1}
               </Badge>
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{eventName}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={(e) => { e.stopPropagation(); openEdit(a); }}
+              >
+                <Pencil className="h-3 w-3 mr-1" /> Edit
+              </Button>
             </CardContent>
           </Card>
         ))}
@@ -235,6 +409,67 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
                   <Printer className="h-4 w-4 mr-1" /> Print
                 </Button>
               </div>
+              <div className="grid grid-cols-4 gap-2 w-full">
+                <Button variant="outline" size="sm" onClick={handleShareEmail} title="Share via Email">
+                  <Mail className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleShareWhatsApp} title="Share via WhatsApp" className="text-emerald-600">
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleShareInstagram} title="Share via Instagram" className="text-pink-600">
+                  <Instagram className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => openEdit(selectedAttendee)} title="Edit attendee">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit attendee dialog — QR (ticket_id) stays the same */}
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Edit Attendee</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                <span className="font-mono tracking-widest">{editing.ticket_id || editing.id.slice(0, 12).toUpperCase()}</span>
+                <p className="mt-1">QR code & ticket ID will not change.</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm">Name</Label>
+                <Input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-sm">Role</Label>
+                  <Input value={editForm.role} onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))} placeholder="e.g. VIP, Speaker" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">Admit(s)</Label>
+                  <Input type="number" min="1" value={editForm.admits} onChange={(e) => setEditForm((p) => ({ ...p, admits: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-sm">Email</Label>
+                  <Input type="email" value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">Phone</Label>
+                  <Input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button className="flex-1 gradient-sunset text-primary-foreground" onClick={handleSaveEdit} disabled={savingEdit}>
+                  {savingEdit ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving...</> : "Save Changes"}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -252,6 +487,38 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
         {attendees.map((a) => badgeHTML(a, eventName))}
+      </div>
+
+      {/* Hidden: rendered React badges used by bulk PNG export */}
+      <div ref={bulkRenderRef} style={{ position: "fixed", left: "-10000px", top: 0, pointerEvents: "none" }}>
+        {attendees.map((a) => (
+          <div
+            key={`bulk-${a.id}`}
+            id={`bulk-badge-${a.id}`}
+            style={{
+              width: 320,
+              padding: 24,
+              background: "#ffffff",
+              border: "1px solid #e5e5e5",
+              borderRadius: 12,
+              textAlign: "center",
+              fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
+              marginBottom: 12,
+            }}
+          >
+            <QRCodeSVG value={a.ticket_id || a.id} size={140} level="M" includeMargin />
+            <p style={{ fontFamily: "monospace", fontSize: 11, color: "#666", letterSpacing: 2, margin: "8px 0" }}>
+              {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
+            </p>
+            <p style={{ fontSize: 18, fontWeight: 700, margin: "4px 0", color: "#111" }}>{a.name}</p>
+            <p style={{ fontSize: 12, color: "#666" }}>{a.email || a.phone || ""}</p>
+            {a.role && (
+              <span style={{ display: "inline-block", background: "#f97316", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6 }}>{a.role}</span>
+            )}
+            <span style={{ display: "inline-block", background: "#2563eb", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6, marginLeft: 4 }}>Admit {a.admits || 1}</span>
+            <p style={{ fontSize: 10, color: "#999", marginTop: 8, textTransform: "uppercase", letterSpacing: 1 }}>{eventName}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
