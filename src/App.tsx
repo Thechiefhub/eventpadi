@@ -20,6 +20,7 @@ import NarrativeStudioPage from "./pages/NarrativeStudioPage";
 import AcceptInvite from "./pages/AcceptInvite";
 import CertificateLookup from "./pages/CertificateLookup";
 import AdminPage from "./pages/AdminPage";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/certificate" element={<CertificateLookup />} />
             <Route
