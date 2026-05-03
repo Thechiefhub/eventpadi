@@ -16,6 +16,9 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,6 +57,25 @@ export default function Auth() {
       toast.error(error.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) { toast.error("Enter your email"); return; }
+    setSendingReset(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("Password reset link sent — check your inbox");
+      setShowForgot(false);
+      setForgotEmail("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reset email");
+    } finally {
+      setSendingReset(false);
     }
   };
 
@@ -130,6 +152,17 @@ export default function Auth() {
                   minLength={6}
                 />
               </div>
+              {isLogin && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(true); setForgotEmail(email); }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={submitting}>
                 <Mail className="h-4 w-4 mr-2" />
                 {submitting ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
@@ -147,6 +180,38 @@ export default function Auth() {
             </p>
           </CardContent>
         </Card>
+
+        {showForgot && (
+          <Card className="border-border mt-4">
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Reset your password</CardTitle>
+              <CardDescription>We'll email you a secure link to set a new password.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="forgot-email">Email</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setShowForgot(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={sendingReset}>
+                    {sendingReset ? "Sending..." : "Send reset link"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
