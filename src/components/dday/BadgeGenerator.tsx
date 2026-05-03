@@ -1,6 +1,6 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,57 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
+  eventId: string;
   attendees: Attendee[];
   eventName: string;
   onGenerateMissingIds?: () => Promise<void>;
 }
+
+/** Per-channel customizable templates (persisted per event). Variables: {{name}}, {{event}}, {{ticket}}, {{admits}}, {{role}} */
+type ShareTemplates = {
+  emailSubject: string;
+  emailBody: string;
+  whatsappBody: string;
+  instagramCaption: string;
+};
+
+const DEFAULT_TEMPLATES: ShareTemplates = {
+  emailSubject: "Your badge for {{event}}",
+  emailBody:
+    "Hi {{name}},\n\nHere is your check-in badge for {{event}}.\nTicket ID: {{ticket}}\nAdmits: {{admits}}\n\nPresent the QR code at the entrance. See you there!",
+  whatsappBody:
+    "Your badge for *{{event}}*\nTicket ID: {{ticket}}\nAdmits: {{admits}}\nPresent the QR code at the entrance.",
+  instagramCaption: "{{event}} — see you there! 🎟️ Ticket {{ticket}}",
+};
+
+function applyVars(tpl: string, ctx: { name: string; event: string; ticket: string; admits: number | string; role: string }) {
+  return tpl
+    .replace(/\{\{name\}\}/g, ctx.name)
+    .replace(/\{\{event\}\}/g, ctx.event)
+    .replace(/\{\{ticket\}\}/g, ctx.ticket)
+    .replace(/\{\{admits\}\}/g, String(ctx.admits))
+    .replace(/\{\{role\}\}/g, ctx.role);
+}
+
+type ShareLog = {
+  id: string;
+  attendee_id: string;
+  channel: string;
+  recipient: string | null;
+  subject: string | null;
+  status: string;
+  error: string | null;
+  attempts: number;
+  last_attempt_at: string | null;
+  created_at: string;
+};
 
 const BADGE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,7 +90,7 @@ function badgeHTML(a: Attendee, eventName: string, innerRef?: React.RefObject<HT
   );
 }
 
-export default function BadgeGenerator({ attendees, eventName, onGenerateMissingIds }: Props) {
+export default function BadgeGenerator({ eventId, attendees, eventName, onGenerateMissingIds }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
   const badgeCardRef = useRef<HTMLDivElement>(null);
@@ -61,6 +102,51 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
   const [editing, setEditing] = useState<Attendee | null>(null);
   const [editForm, setEditForm] = useState({ name: "", role: "", admits: "1", email: "", phone: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Share templates (persisted per event)
+  const tplKey = `badge_share_templates_${eventId}`;
+  const [templates, setTemplates] = useState<ShareTemplates>(DEFAULT_TEMPLATES);
+  const [showTemplates, setShowTemplates] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(tplKey);
+      setTemplates(raw ? { ...DEFAULT_TEMPLATES, ...JSON.parse(raw) } : DEFAULT_TEMPLATES);
+    } catch { setTemplates(DEFAULT_TEMPLATES); }
+  }, [tplKey]);
+  const saveTemplates = (next: ShareTemplates) => {
+    setTemplates(next);
+    try { localStorage.setItem(tplKey, JSON.stringify(next)); } catch {}
+  };
+
+  // Share-all (bulk email) state
+  const [shareAllOpen, setShareAllOpen] = useState(false);
+  const [shareAllProgress, setShareAllProgress] = useState<{ current: number; total: number; sent: number; failed: number } | null>(null);
+
+  // Delivery log
+  const [logs, setLogs] = useState<ShareLog[]>([]);
+  const [showLog, setShowLog] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const fetchLogs = useCallback(async () => {
+    if (!eventId) return;
+    const { data } = await supabase
+      .from("badge_share_log")
+      .select("id,attendee_id,channel,recipient,subject,status,error,attempts,last_attempt_at,created_at")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setLogs((data as any) || []);
+  }, [eventId]);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  // Realtime updates for log
+  useEffect(() => {
+    if (!eventId) return;
+    const ch = supabase
+      .channel(`badge-share-${eventId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "badge_share_log", filter: `event_id=eq.${eventId}` }, () => fetchLogs())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, fetchLogs]);
 
   const handleDownloadPNG = useCallback(async () => {
     if (!badgeCardRef.current || !selectedAttendee) return;
@@ -118,42 +204,74 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
     return await toPng(badgeCardRef.current, { pixelRatio: 3, backgroundColor: "#ffffff" });
   }, []);
 
-  // Share via Email (uses native share with file when supported, otherwise mailto)
+  // Build context object for variable substitution
+  const ctxFor = useCallback((a: Attendee) => ({
+    name: a.name,
+    event: eventName,
+    ticket: a.ticket_id || a.id.slice(0, 12).toUpperCase(),
+    admits: a.admits || 1,
+    role: a.role || "",
+  }), [eventName]);
+
+  // Render any attendee's hidden bulk badge into PNG (used by share-all)
+  const renderAttendeeBadgePng = useCallback(async (a: Attendee): Promise<string | null> => {
+    const node = document.getElementById(`bulk-badge-${a.id}`);
+    if (!node) return null;
+    return await toPng(node, { pixelRatio: 3, backgroundColor: "#ffffff" });
+  }, []);
+
+  // Send a single badge via the edge function (used by single-share AND share-all)
+  const sendBadgeEmail = useCallback(async (a: Attendee, opts?: { logId?: string }) => {
+    if (!a.email) return { ok: false, error: "No email on file" };
+    const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+    if (!dataUrl) return { ok: false, error: "Failed to render badge image" };
+    const pngBase64 = dataUrl.split(",")[1];
+    const { data, error } = await supabase.functions.invoke("send-badge-email", {
+      body: {
+        attendeeId: a.id,
+        attendeeEmail: a.email,
+        attendeeName: a.name,
+        eventId,
+        eventName,
+        subject: templates.emailSubject,
+        message: templates.emailBody,
+        pngBase64,
+        ticketId: a.ticket_id || a.id.slice(0, 12).toUpperCase(),
+        admits: a.admits || 1,
+        role: a.role || "",
+        logId: opts?.logId,
+      },
+    });
+    if (error) return { ok: false, error: error.message || "Network error" };
+    if (!(data as any)?.success) return { ok: false, error: (data as any)?.error || "Delivery failed" };
+    return { ok: true };
+  }, [eventId, eventName, templates, renderAttendeeBadgePng, renderBadgePngDataUrl]);
+
+  // Share via Email — uses customized template + tracked delivery via edge function
   const handleShareEmail = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const subject = `Your badge for ${eventName}`;
-    const body = `Hi ${a.name},\n\nHere is your check-in badge for ${eventName}.\nTicket ID: ${a.ticket_id || a.id.slice(0, 12).toUpperCase()}\nAdmits: ${a.admits || 1}\n\nPlease present this QR code at the entrance.\n\nSee you there!`;
-    try {
-      const dataUrl = await renderBadgePngDataUrl();
-      if (dataUrl && (navigator as any).canShare) {
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
-        if ((navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({ files: [file], title: subject, text: body });
-          return;
-        }
-      }
-    } catch {}
-    if (a.email) {
-      window.location.href = `mailto:${a.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    } else {
-      toast.error("No email on file. Add one via Edit.");
-    }
-  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+    if (!a.email) { toast.error("No email on file. Add one via Edit."); return; }
+    const t = toast.loading(`Sending badge to ${a.email}…`);
+    const res = await sendBadgeEmail(a);
+    if (res.ok) toast.success(`Badge sent to ${a.email}`, { id: t });
+    else toast.error(`Failed: ${res.error}`, { id: t });
+    fetchLogs();
+  }, [selectedAttendee, sendBadgeEmail, fetchLogs]);
 
-  // Share via WhatsApp — opens wa.me with text; user can attach the downloaded PNG
+  // Share via WhatsApp — uses customized template
   const handleShareWhatsApp = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const text = `Your badge for *${eventName}*%0ATicket ID: ${a.ticket_id || a.id.slice(0, 12).toUpperCase()}%0AAdmits: ${a.admits || 1}%0APresent the QR code at the entrance.`;
+    const rendered = applyVars(templates.whatsappBody, ctxFor(a));
+    const text = encodeURIComponent(rendered);
     try {
       const dataUrl = await renderBadgePngDataUrl();
       if (dataUrl && (navigator as any).canShare) {
         const blob = await (await fetch(dataUrl)).blob();
         const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
         if ((navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: text.replace(/%0A/g, "\n") });
+          await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: rendered });
           return;
         }
       }
@@ -161,32 +279,65 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
     const phone = (a.phone || "").replace(/[^\d]/g, "");
     const url = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, "_blank");
-  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
 
-  // Share via Instagram — Instagram has no public share URL; use Web Share API or copy + open
+  // Share via Instagram — uses customized caption (copied to clipboard) + native share / fallback
   const handleShareInstagram = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
+    const caption = applyVars(templates.instagramCaption, ctxFor(a));
     try {
       const dataUrl = await renderBadgePngDataUrl();
       if (!dataUrl) return;
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
       if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
-        await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: `${eventName} — ${a.ticket_id || ""}` });
+        await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: caption });
         return;
       }
-      // Fallback: download the badge then open Instagram so user can post it
+      // Fallback: copy caption + download badge then open Instagram
+      try { await navigator.clipboard.writeText(caption); } catch {}
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = `badge-${a.name}.png`;
       link.click();
-      toast.success("Badge downloaded — opening Instagram to upload");
+      toast.success("Badge downloaded & caption copied — opening Instagram");
       window.open("https://www.instagram.com/", "_blank");
     } catch (err: any) {
       toast.error(`Instagram share failed: ${err.message || err}`);
     }
-  }, [selectedAttendee, eventName, renderBadgePngDataUrl]);
+  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
+
+  // SHARE ALL — bulk email all attendees with email addresses
+  const handleShareAllEmails = useCallback(async () => {
+    const targets = attendees.filter((a) => !!a.email);
+    if (targets.length === 0) { toast.error("No attendees have an email address."); return; }
+    setShareAllProgress({ current: 0, total: targets.length, sent: 0, failed: 0 });
+    let sent = 0, failed = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const a = targets[i];
+      const res = await sendBadgeEmail(a);
+      if (res.ok) sent++; else failed++;
+      setShareAllProgress({ current: i + 1, total: targets.length, sent, failed });
+    }
+    toast[failed === 0 ? "success" : "warning"](`Bulk send complete: ${sent} sent, ${failed} failed`);
+    setShareAllProgress(null);
+    fetchLogs();
+    setShowLog(true);
+  }, [attendees, sendBadgeEmail, fetchLogs]);
+
+  // Retry a failed log entry
+  const handleRetry = useCallback(async (log: ShareLog) => {
+    const a = attendees.find((x) => x.id === log.attendee_id);
+    if (!a) { toast.error("Attendee no longer exists"); return; }
+    if (!a.email) { toast.error("Attendee has no email — edit to add one"); return; }
+    setRetrying(log.id);
+    const res = await sendBadgeEmail(a, { logId: log.id });
+    if (res.ok) toast.success(`Resent to ${a.email}`);
+    else toast.error(`Retry failed: ${res.error}`);
+    setRetrying(null);
+    fetchLogs();
+  }, [attendees, sendBadgeEmail, fetchLogs]);
 
   // Open edit dialog
   const openEdit = (a: Attendee) => {
@@ -287,6 +438,22 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
               <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setShowTemplates(true)}>
+            <Settings2 className="h-4 w-4 mr-1" /> Templates
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShareAllEmails}
+            disabled={!!shareAllProgress}
+            className="text-primary"
+          >
+            {shareAllProgress ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {shareAllProgress.current}/{shareAllProgress.total}</>
+            ) : (
+              <><Send className="h-4 w-4 mr-1" /> Share All Badges</>
+            )}
+          </Button>
           <Button variant="outline" onClick={handleBulkDownload} disabled={!!bulkProgress}>
             {bulkProgress ? (
               <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {bulkProgress.current}/{bulkProgress.total}</>
@@ -299,6 +466,88 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
           </Button>
         </div>
       </div>
+
+      {shareAllProgress && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="flex-1">
+              Sending badges… {shareAllProgress.current}/{shareAllProgress.total}
+              <span className="text-emerald-600 ml-2">✓ {shareAllProgress.sent}</span>
+              <span className="text-destructive ml-2">✗ {shareAllProgress.failed}</span>
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delivery status panel */}
+      <Card className="border-border">
+        <CardContent className="p-3">
+          <button
+            onClick={() => { setShowLog((v) => !v); if (!showLog) fetchLogs(); }}
+            className="flex items-center justify-between w-full text-sm font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" /> Email Delivery Status
+              {logs.length > 0 && (
+                <>
+                  <Badge variant="secondary" className="text-[10px]">{logs.filter((l) => l.status === "sent").length} sent</Badge>
+                  {logs.filter((l) => l.status === "failed").length > 0 && (
+                    <Badge variant="destructive" className="text-[10px]">{logs.filter((l) => l.status === "failed").length} failed</Badge>
+                  )}
+                </>
+              )}
+            </span>
+            {showLog ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          {showLog && (
+            <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
+              {logs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No badge emails sent yet.</p>
+              ) : (
+                logs.map((log) => {
+                  const att = attendees.find((x) => x.id === log.attendee_id);
+                  return (
+                    <div key={log.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/40 text-xs">
+                      {log.status === "sent" ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : log.status === "failed" ? (
+                        <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {att?.name || "Unknown"} <span className="text-muted-foreground font-normal">· {log.recipient}</span>
+                        </p>
+                        <p className="text-muted-foreground truncate">
+                          {log.status === "failed" ? (
+                            <span className="text-destructive">{log.error || "Delivery failed"}</span>
+                          ) : (
+                            log.subject || `Sent · ${log.last_attempt_at ? new Date(log.last_attempt_at).toLocaleString() : ""}`
+                          )}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Attempts: {log.attempts}</p>
+                      </div>
+                      {log.status === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleRetry(log)}
+                          disabled={retrying === log.id}
+                        >
+                          {retrying === log.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><RefreshCw className="h-3 w-3 mr-1" /> Retry</>}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Certificate download link for attendees */}
       <CertificateLinkCard />
@@ -472,6 +721,65 @@ export default function BadgeGenerator({ attendees, eventName, onGenerateMissing
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Share message templates dialog */}
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">Customize Share Messages</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Use variables: <code className="bg-muted px-1 rounded">{`{{name}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{event}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{ticket}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{admits}}`}</code>{" "}
+              <code className="bg-muted px-1 rounded">{`{{role}}`}</code>
+            </p>
+
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> Email Subject</Label>
+              <Input
+                value={templates.emailSubject}
+                onChange={(e) => saveTemplates({ ...templates, emailSubject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm">Email Body</Label>
+              <Textarea
+                rows={6}
+                value={templates.emailBody}
+                onChange={(e) => saveTemplates({ ...templates, emailBody: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1 text-emerald-600"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp Message</Label>
+              <Textarea
+                rows={4}
+                value={templates.whatsappBody}
+                onChange={(e) => saveTemplates({ ...templates, whatsappBody: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm flex items-center gap-1 text-pink-600"><Instagram className="h-3.5 w-3.5" /> Instagram Caption</Label>
+              <Textarea
+                rows={3}
+                value={templates.instagramCaption}
+                onChange={(e) => saveTemplates({ ...templates, instagramCaption: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => saveTemplates(DEFAULT_TEMPLATES)}>
+                Reset to defaults
+              </Button>
+              <Button className="flex-1 gradient-sunset text-primary-foreground" onClick={() => { toast.success("Templates saved"); setShowTemplates(false); }}>
+                Done
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

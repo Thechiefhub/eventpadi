@@ -79,6 +79,54 @@ export type Database = {
           },
         ]
       }
+      badge_share_log: {
+        Row: {
+          attempts: number
+          attendee_id: string
+          channel: string
+          created_at: string
+          error: string | null
+          event_id: string
+          id: string
+          last_attempt_at: string | null
+          recipient: string | null
+          status: string
+          subject: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          attendee_id: string
+          channel?: string
+          created_at?: string
+          error?: string | null
+          event_id: string
+          id?: string
+          last_attempt_at?: string | null
+          recipient?: string | null
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          attendee_id?: string
+          channel?: string
+          created_at?: string
+          error?: string | null
+          event_id?: string
+          id?: string
+          last_attempt_at?: string | null
+          recipient?: string | null
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       checklist_items: {
         Row: {
           category: string
