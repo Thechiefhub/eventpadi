@@ -40,11 +40,11 @@ const DEFAULT_TEMPLATES: ShareTemplates = {
 
 function applyVars(tpl: string, ctx: { name: string; event: string; ticket: string; admits: number | string; role: string }) {
   return tpl
-    .replaceAll("{{name}}", ctx.name)
-    .replaceAll("{{event}}", ctx.event)
-    .replaceAll("{{ticket}}", ctx.ticket)
-    .replaceAll("{{admits}}", String(ctx.admits))
-    .replaceAll("{{role}}", ctx.role);
+    .replace(/\{\{name\}\}/g, ctx.name)
+    .replace(/\{\{event\}\}/g, ctx.event)
+    .replace(/\{\{ticket\}\}/g, ctx.ticket)
+    .replace(/\{\{admits\}\}/g, String(ctx.admits))
+    .replace(/\{\{role\}\}/g, ctx.role);
 }
 
 type ShareLog = {
