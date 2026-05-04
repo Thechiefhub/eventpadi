@@ -636,7 +636,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
             className="flex items-center justify-between w-full text-sm font-medium text-foreground"
           >
             <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-primary" /> Email Delivery Status
+              <Mail className="h-4 w-4 text-primary" /> Delivery Status (Email · WhatsApp · Instagram)
               {logs.length > 0 && (
                 <>
                   <Badge variant="secondary" className="text-[10px]">{logs.filter((l) => l.status === "sent").length} sent</Badge>
