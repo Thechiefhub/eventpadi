@@ -666,7 +666,9 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">
-                          {att?.name || "Unknown"} <span className="text-muted-foreground font-normal">· {log.recipient}</span>
+                          {att?.name || "Unknown"}{" "}
+                          <Badge variant="outline" className="text-[10px] ml-1 capitalize">{log.channel}</Badge>
+                          {log.recipient && <span className="text-muted-foreground font-normal"> · {log.recipient}</span>}
                         </p>
                         <p className="text-muted-foreground truncate">
                           {log.status === "failed" ? (
