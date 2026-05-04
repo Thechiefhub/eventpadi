@@ -942,6 +942,135 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
         )}
       </div>
 
+      {/* Share All — recipient filter dialog */}
+      <Dialog open={shareAllOpen} onOpenChange={setShareAllOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2"><Filter className="h-4 w-4" /> Share All Badges</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Channel</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["email", "whatsapp", "instagram"] as const).map((ch) => (
+                  <Button
+                    key={ch}
+                    variant={shareAllChannel === ch ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShareAllChannel(ch)}
+                    className="capitalize"
+                  >
+                    {ch === "email" && <Mail className="h-3.5 w-3.5 mr-1" />}
+                    {ch === "whatsapp" && <MessageCircle className="h-3.5 w-3.5 mr-1" />}
+                    {ch === "instagram" && <Instagram className="h-3.5 w-3.5 mr-1" />}
+                    {ch}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Recipient filter</Label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={shareAllFilter.requireEmail}
+                  onCheckedChange={(v) => setShareAllFilter((p) => ({ ...p, requireEmail: !!v }))}
+                />
+                Only attendees with email on file
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={shareAllFilter.requirePhone}
+                  onCheckedChange={(v) => setShareAllFilter((p) => ({ ...p, requirePhone: !!v }))}
+                />
+                Only attendees with phone (for WhatsApp)
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Attendees missing the required contact info are excluded automatically.
+                The badge PNG is included with every send.
+              </p>
+            </div>
+
+            <div className="rounded-md bg-muted/50 p-3 text-xs">
+              <p className="font-medium text-foreground">
+                {shareAllTargets().length} of {attendees.length} attendees will receive their badge
+              </p>
+              <p className="text-muted-foreground mt-1">
+                {attendees.length - shareAllTargets().length} excluded by filter
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShareAllOpen(false)}>Cancel</Button>
+              <Button
+                className="flex-1 gradient-sunset text-primary-foreground"
+                onClick={handleShareAllConfirm}
+                disabled={shareAllTargets().length === 0}
+              >
+                <Send className="h-4 w-4 mr-1" /> Send to {shareAllTargets().length}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-attendee share preview — confirm subject/message before sending */}
+      <Dialog open={!!sharePreview} onOpenChange={(open) => !open && setSharePreview(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Eye className="h-4 w-4" /> Preview {sharePreview?.channel === "email" ? "Email" : sharePreview?.channel === "whatsapp" ? "WhatsApp" : "Instagram"}
+            </DialogTitle>
+          </DialogHeader>
+          {sharePreview && (
+            <div className="space-y-3">
+              <div className="rounded-md bg-muted/50 p-3 text-xs">
+                <p><span className="text-muted-foreground">To:</span>{" "}
+                  <span className="font-medium text-foreground">{sharePreview.attendee.name}</span>
+                  {sharePreview.channel === "email" && sharePreview.attendee.email && (
+                    <span className="text-muted-foreground"> · {sharePreview.attendee.email}</span>
+                  )}
+                  {sharePreview.channel === "whatsapp" && (
+                    <span className="text-muted-foreground"> · {sharePreview.attendee.phone || "no phone — will open WhatsApp web"}</span>
+                  )}
+                </p>
+                <p className="text-muted-foreground mt-1">Badge PNG will be attached/downloaded automatically.</p>
+              </div>
+
+              {sharePreview.channel === "email" && (
+                <div className="space-y-1">
+                  <Label className="text-sm">Subject</Label>
+                  <Input
+                    value={sharePreview.subject}
+                    onChange={(e) => setSharePreview((p) => p ? { ...p, subject: e.target.value } : p)}
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-sm">{sharePreview.channel === "instagram" ? "Caption" : "Message"}</Label>
+                <Textarea
+                  rows={sharePreview.channel === "email" ? 8 : 5}
+                  value={sharePreview.message}
+                  onChange={(e) => setSharePreview((p) => p ? { ...p, message: e.target.value } : p)}
+                />
+                <p className="text-[10px] text-muted-foreground">Variables already resolved for this attendee.</p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setSharePreview(null)} disabled={sendingPreview}>Cancel</Button>
+                <Button
+                  className="flex-1 gradient-sunset text-primary-foreground"
+                  onClick={confirmSharePreview}
+                  disabled={sendingPreview}
+                >
+                  {sendingPreview ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Sending…</> : <><Send className="h-4 w-4 mr-1" /> Confirm & Send</>}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
         {attendees.map((a) => badgeHTML(a, eventName))}
