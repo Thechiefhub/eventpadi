@@ -1,4 +1,4 @@
-import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck, Star, Shield } from "lucide-react";
+import { Lightbulb, Handshake, Megaphone, Settings, LayoutDashboard, LogOut, CalendarCheck, Star, Shield, ClipboardList } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ const mainItems = [
 ];
 
 const moduleItems = [
+  { title: "Registration", url: "/dashboard/registration", icon: ClipboardList },
   { title: "The Spark", url: "/dashboard/spark", icon: Lightbulb },
   { title: "The Chase", url: "/dashboard/chase", icon: Handshake },
   { title: "The Buzz", url: "/dashboard/buzz", icon: Megaphone },
