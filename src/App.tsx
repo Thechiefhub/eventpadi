@@ -21,6 +21,8 @@ import AcceptInvite from "./pages/AcceptInvite";
 import CertificateLookup from "./pages/CertificateLookup";
 import AdminPage from "./pages/AdminPage";
 import ResetPassword from "./pages/ResetPassword";
+import RegistrationModule from "./pages/RegistrationModule";
+import PublicRegistration from "./pages/PublicRegistration";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/certificate" element={<CertificateLookup />} />
+            <Route path="/r/:slug" element={<PublicRegistration />} />
             <Route
               path="/dashboard"
               element={
@@ -46,6 +49,7 @@ const App = () => (
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="registration" element={<RegistrationModule />} />
               <Route path="spark" element={<SparkModule />} />
               <Route path="chase" element={<ChaseModule />} />
               <Route path="buzz" element={<BuzzModule />} />
