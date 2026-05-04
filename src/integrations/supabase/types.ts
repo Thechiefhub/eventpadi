@@ -221,6 +221,144 @@ export type Database = {
           },
         ]
       }
+      event_registration_pages: {
+        Row: {
+          capacity: number | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          end_at: string | null
+          event_id: string
+          flyer_url: string | null
+          general_enabled: boolean
+          general_price: number | null
+          id: string
+          is_paid: boolean
+          is_published: boolean
+          location: string | null
+          slug: string
+          start_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          venue_address: string | null
+          vip_enabled: boolean
+          vip_price: number | null
+          vvip_enabled: boolean
+          vvip_price: number | null
+        }
+        Insert: {
+          capacity?: number | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          end_at?: string | null
+          event_id: string
+          flyer_url?: string | null
+          general_enabled?: boolean
+          general_price?: number | null
+          id?: string
+          is_paid?: boolean
+          is_published?: boolean
+          location?: string | null
+          slug: string
+          start_at?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          venue_address?: string | null
+          vip_enabled?: boolean
+          vip_price?: number | null
+          vvip_enabled?: boolean
+          vvip_price?: number | null
+        }
+        Update: {
+          capacity?: number | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          end_at?: string | null
+          event_id?: string
+          flyer_url?: string | null
+          general_enabled?: boolean
+          general_price?: number | null
+          id?: string
+          is_paid?: boolean
+          is_published?: boolean
+          location?: string | null
+          slug?: string
+          start_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          venue_address?: string | null
+          vip_enabled?: boolean
+          vip_price?: number | null
+          vvip_enabled?: boolean
+          vvip_price?: number | null
+        }
+        Relationships: []
+      }
+      event_registrations: {
+        Row: {
+          admits: number
+          amount: number | null
+          attendee_id: string | null
+          created_at: string
+          email: string | null
+          event_id: string
+          id: string
+          name: string
+          notes: string | null
+          payment_status: string
+          phone: string | null
+          registration_page_id: string
+          ticket_tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admits?: number
+          amount?: number | null
+          attendee_id?: string | null
+          created_at?: string
+          email?: string | null
+          event_id: string
+          id?: string
+          name: string
+          notes?: string | null
+          payment_status?: string
+          phone?: string | null
+          registration_page_id: string
+          ticket_tier?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admits?: number
+          amount?: number | null
+          attendee_id?: string | null
+          created_at?: string
+          email?: string | null
+          event_id?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_status?: string
+          phone?: string | null
+          registration_page_id?: string
+          ticket_tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_team_members: {
         Row: {
           created_at: string
