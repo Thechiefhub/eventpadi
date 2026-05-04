@@ -122,6 +122,18 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   // Share-all (bulk email) state
   const [shareAllOpen, setShareAllOpen] = useState(false);
   const [shareAllProgress, setShareAllProgress] = useState<{ current: number; total: number; sent: number; failed: number } | null>(null);
+  // Share-all recipient filter
+  const [shareAllChannel, setShareAllChannel] = useState<"email" | "whatsapp" | "instagram">("email");
+  const [shareAllFilter, setShareAllFilter] = useState({ requireEmail: true, requirePhone: false, excludeAlreadySent: false });
+
+  // Per-attendee share preview (confirm before sending)
+  const [sharePreview, setSharePreview] = useState<{
+    channel: "email" | "whatsapp" | "instagram";
+    attendee: Attendee;
+    subject: string;
+    message: string;
+  } | null>(null);
+  const [sendingPreview, setSendingPreview] = useState(false);
 
   // Delivery log
   const [logs, setLogs] = useState<ShareLog[]>([]);
@@ -253,79 +265,214 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
     if (!selectedAttendee) return;
     const a = selectedAttendee;
     if (!a.email) { toast.error("No email on file. Add one via Edit."); return; }
-    const t = toast.loading(`Sending badge to ${a.email}…`);
-    const res = await sendBadgeEmail(a);
-    if (res.ok) toast.success(`Badge sent to ${a.email}`, { id: t });
-    else toast.error(`Failed: ${res.error}`, { id: t });
-    fetchLogs();
-  }, [selectedAttendee, sendBadgeEmail, fetchLogs]);
+    setSharePreview({
+      channel: "email",
+      attendee: a,
+      subject: applyVars(templates.emailSubject, ctxFor(a)),
+      message: applyVars(templates.emailBody, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // Share via WhatsApp — uses customized template
+  // Share via WhatsApp — open preview first
   const handleShareWhatsApp = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const rendered = applyVars(templates.whatsappBody, ctxFor(a));
-    const text = encodeURIComponent(rendered);
-    try {
-      const dataUrl = await renderBadgePngDataUrl();
-      if (dataUrl && (navigator as any).canShare) {
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
-        if ((navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: rendered });
-          return;
-        }
-      }
-    } catch {}
-    const phone = (a.phone || "").replace(/[^\d]/g, "");
-    const url = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(url, "_blank");
-  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
+    setSharePreview({
+      channel: "whatsapp",
+      attendee: a,
+      subject: "",
+      message: applyVars(templates.whatsappBody, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // Share via Instagram — uses customized caption (copied to clipboard) + native share / fallback
   const handleShareInstagram = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const caption = applyVars(templates.instagramCaption, ctxFor(a));
-    try {
-      const dataUrl = await renderBadgePngDataUrl();
-      if (!dataUrl) return;
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
-      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
-        await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: caption });
-        return;
-      }
-      // Fallback: copy caption + download badge then open Instagram
-      try { await navigator.clipboard.writeText(caption); } catch {}
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `badge-${a.name}.png`;
-      link.click();
-      toast.success("Badge downloaded & caption copied — opening Instagram");
-      window.open("https://www.instagram.com/", "_blank");
-    } catch (err: any) {
-      toast.error(`Instagram share failed: ${err.message || err}`);
-    }
-  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
+    setSharePreview({
+      channel: "instagram",
+      attendee: a,
+      subject: "",
+      message: applyVars(templates.instagramCaption, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // SHARE ALL — bulk email all attendees with email addresses
-  const handleShareAllEmails = useCallback(async () => {
-    const targets = attendees.filter((a) => !!a.email);
-    if (targets.length === 0) { toast.error("No attendees have an email address."); return; }
+  // Log a share attempt (used for WhatsApp/Instagram tracking)
+  const logShareAttempt = useCallback(async (
+    a: Attendee,
+    channel: "whatsapp" | "instagram",
+    recipient: string | null,
+    status: "sent" | "failed",
+    error: string | null,
+    subject: string | null,
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("badge_share_log").insert({
+      event_id: eventId,
+      attendee_id: a.id,
+      user_id: user.id,
+      channel,
+      recipient,
+      subject,
+      status,
+      error,
+      attempts: 1,
+      last_attempt_at: new Date().toISOString(),
+    });
+    fetchLogs();
+  }, [eventId, fetchLogs]);
+
+  // Confirm preview & dispatch
+  const confirmSharePreview = useCallback(async () => {
+    if (!sharePreview) return;
+    setSendingPreview(true);
+    const { channel, attendee: a, subject, message } = sharePreview;
+    try {
+      if (channel === "email") {
+        const t = toast.loading(`Sending badge to ${a.email}…`);
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        if (!dataUrl) { toast.error("Failed to render badge image", { id: t }); return; }
+        const pngBase64 = dataUrl.split(",")[1];
+        const { data, error } = await supabase.functions.invoke("send-badge-email", {
+          body: {
+            attendeeId: a.id, attendeeEmail: a.email, attendeeName: a.name,
+            eventId, eventName, subject, message, pngBase64,
+            ticketId: a.ticket_id || a.id.slice(0, 12).toUpperCase(),
+            admits: a.admits || 1, role: a.role || "",
+          },
+        });
+        if (error || !(data as any)?.success) {
+          toast.error(`Failed: ${error?.message || (data as any)?.error || "Delivery failed"}`, { id: t });
+        } else {
+          toast.success(`Badge sent to ${a.email}`, { id: t });
+        }
+        fetchLogs();
+      } else if (channel === "whatsapp") {
+        // Render badge PNG → attempt to share file (so badge image is included)
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        let shared = false;
+        try {
+          if (dataUrl && (navigator as any).canShare) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+            if ((navigator as any).canShare({ files: [file] })) {
+              await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: message });
+              shared = true;
+            }
+          }
+        } catch {}
+        if (!shared) {
+          // Always download the badge PNG so the user can attach it in WhatsApp
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          const phone = (a.phone || "").replace(/[^\d]/g, "");
+          const url = phone
+            ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+            : `https://wa.me/?text=${encodeURIComponent(message)}`;
+          window.open(url, "_blank");
+          toast.success("Badge downloaded — attach it in WhatsApp");
+        }
+        await logShareAttempt(a, "whatsapp", a.phone || null, "sent", null, null);
+      } else if (channel === "instagram") {
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        let shared = false;
+        try {
+          if (dataUrl && (navigator as any).canShare) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+            if ((navigator as any).canShare({ files: [file] })) {
+              await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: message });
+              shared = true;
+            }
+          }
+        } catch {}
+        if (!shared) {
+          try { await navigator.clipboard.writeText(message); } catch {}
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          window.open("https://www.instagram.com/", "_blank");
+          toast.success("Badge downloaded & caption copied");
+        }
+        await logShareAttempt(a, "instagram", null, "sent", null, null);
+      }
+      setSharePreview(null);
+    } catch (err: any) {
+      toast.error(`Share failed: ${err.message || err}`);
+      if (sharePreview.channel !== "email") {
+        await logShareAttempt(sharePreview.attendee, sharePreview.channel, null, "failed", String(err?.message || err), null);
+      }
+    } finally {
+      setSendingPreview(false);
+    }
+  }, [sharePreview, eventId, eventName, renderAttendeeBadgePng, renderBadgePngDataUrl, fetchLogs, logShareAttempt]);
+
+  // Compute filtered targets for "Share All"
+  const shareAllTargets = useCallback(() => {
+    return attendees.filter((a) => {
+      if (shareAllFilter.requireEmail && !a.email) return false;
+      if (shareAllFilter.requirePhone && !a.phone) return false;
+      if (shareAllChannel === "email" && !a.email) return false;
+      if (shareAllChannel === "whatsapp" && !a.phone) return false;
+      return true;
+    });
+  }, [attendees, shareAllFilter, shareAllChannel]);
+
+  // SHARE ALL — bulk send via selected channel with recipient filter
+  const handleShareAllConfirm = useCallback(async () => {
+    const targets = shareAllTargets();
+    if (targets.length === 0) { toast.error("No attendees match the selected filter."); return; }
+    setShareAllOpen(false);
     setShareAllProgress({ current: 0, total: targets.length, sent: 0, failed: 0 });
     let sent = 0, failed = 0;
     for (let i = 0; i < targets.length; i++) {
       const a = targets[i];
-      const res = await sendBadgeEmail(a);
-      if (res.ok) sent++; else failed++;
+      try {
+        if (shareAllChannel === "email") {
+          const res = await sendBadgeEmail(a);
+          if (res.ok) sent++; else failed++;
+        } else if (shareAllChannel === "whatsapp") {
+          // Open WhatsApp link per attendee (user must attach badge PNG manually — so we also download it)
+          const dataUrl = await renderAttendeeBadgePng(a);
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          const phone = (a.phone || "").replace(/[^\d]/g, "");
+          const message = applyVars(templates.whatsappBody, ctxFor(a));
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+          await logShareAttempt(a, "whatsapp", a.phone || null, "sent", null, null);
+          sent++;
+        } else if (shareAllChannel === "instagram") {
+          const dataUrl = await renderAttendeeBadgePng(a);
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          await logShareAttempt(a, "instagram", null, "sent", null, null);
+          sent++;
+        }
+      } catch (err: any) {
+        failed++;
+      }
       setShareAllProgress({ current: i + 1, total: targets.length, sent, failed });
     }
     toast[failed === 0 ? "success" : "warning"](`Bulk send complete: ${sent} sent, ${failed} failed`);
     setShareAllProgress(null);
     fetchLogs();
     setShowLog(true);
-  }, [attendees, sendBadgeEmail, fetchLogs]);
+  }, [shareAllTargets, shareAllChannel, sendBadgeEmail, renderAttendeeBadgePng, templates, ctxFor, logShareAttempt, fetchLogs]);
 
   // Retry a failed log entry
   const handleRetry = useCallback(async (log: ShareLog) => {
