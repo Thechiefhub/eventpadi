@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Eye, Filter } from "lucide-react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
@@ -121,6 +122,18 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   // Share-all (bulk email) state
   const [shareAllOpen, setShareAllOpen] = useState(false);
   const [shareAllProgress, setShareAllProgress] = useState<{ current: number; total: number; sent: number; failed: number } | null>(null);
+  // Share-all recipient filter
+  const [shareAllChannel, setShareAllChannel] = useState<"email" | "whatsapp" | "instagram">("email");
+  const [shareAllFilter, setShareAllFilter] = useState({ requireEmail: true, requirePhone: false, excludeAlreadySent: false });
+
+  // Per-attendee share preview (confirm before sending)
+  const [sharePreview, setSharePreview] = useState<{
+    channel: "email" | "whatsapp" | "instagram";
+    attendee: Attendee;
+    subject: string;
+    message: string;
+  } | null>(null);
+  const [sendingPreview, setSendingPreview] = useState(false);
 
   // Delivery log
   const [logs, setLogs] = useState<ShareLog[]>([]);
@@ -252,79 +265,214 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
     if (!selectedAttendee) return;
     const a = selectedAttendee;
     if (!a.email) { toast.error("No email on file. Add one via Edit."); return; }
-    const t = toast.loading(`Sending badge to ${a.email}…`);
-    const res = await sendBadgeEmail(a);
-    if (res.ok) toast.success(`Badge sent to ${a.email}`, { id: t });
-    else toast.error(`Failed: ${res.error}`, { id: t });
-    fetchLogs();
-  }, [selectedAttendee, sendBadgeEmail, fetchLogs]);
+    setSharePreview({
+      channel: "email",
+      attendee: a,
+      subject: applyVars(templates.emailSubject, ctxFor(a)),
+      message: applyVars(templates.emailBody, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // Share via WhatsApp — uses customized template
+  // Share via WhatsApp — open preview first
   const handleShareWhatsApp = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const rendered = applyVars(templates.whatsappBody, ctxFor(a));
-    const text = encodeURIComponent(rendered);
-    try {
-      const dataUrl = await renderBadgePngDataUrl();
-      if (dataUrl && (navigator as any).canShare) {
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
-        if ((navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: rendered });
-          return;
-        }
-      }
-    } catch {}
-    const phone = (a.phone || "").replace(/[^\d]/g, "");
-    const url = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(url, "_blank");
-  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
+    setSharePreview({
+      channel: "whatsapp",
+      attendee: a,
+      subject: "",
+      message: applyVars(templates.whatsappBody, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // Share via Instagram — uses customized caption (copied to clipboard) + native share / fallback
   const handleShareInstagram = useCallback(async () => {
     if (!selectedAttendee) return;
     const a = selectedAttendee;
-    const caption = applyVars(templates.instagramCaption, ctxFor(a));
-    try {
-      const dataUrl = await renderBadgePngDataUrl();
-      if (!dataUrl) return;
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
-      if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
-        await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: caption });
-        return;
-      }
-      // Fallback: copy caption + download badge then open Instagram
-      try { await navigator.clipboard.writeText(caption); } catch {}
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `badge-${a.name}.png`;
-      link.click();
-      toast.success("Badge downloaded & caption copied — opening Instagram");
-      window.open("https://www.instagram.com/", "_blank");
-    } catch (err: any) {
-      toast.error(`Instagram share failed: ${err.message || err}`);
-    }
-  }, [selectedAttendee, templates, ctxFor, renderBadgePngDataUrl]);
+    setSharePreview({
+      channel: "instagram",
+      attendee: a,
+      subject: "",
+      message: applyVars(templates.instagramCaption, ctxFor(a)),
+    });
+  }, [selectedAttendee, templates, ctxFor]);
 
-  // SHARE ALL — bulk email all attendees with email addresses
-  const handleShareAllEmails = useCallback(async () => {
-    const targets = attendees.filter((a) => !!a.email);
-    if (targets.length === 0) { toast.error("No attendees have an email address."); return; }
+  // Log a share attempt (used for WhatsApp/Instagram tracking)
+  const logShareAttempt = useCallback(async (
+    a: Attendee,
+    channel: "whatsapp" | "instagram",
+    recipient: string | null,
+    status: "sent" | "failed",
+    error: string | null,
+    subject: string | null,
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("badge_share_log").insert({
+      event_id: eventId,
+      attendee_id: a.id,
+      user_id: user.id,
+      channel,
+      recipient,
+      subject,
+      status,
+      error,
+      attempts: 1,
+      last_attempt_at: new Date().toISOString(),
+    });
+    fetchLogs();
+  }, [eventId, fetchLogs]);
+
+  // Confirm preview & dispatch
+  const confirmSharePreview = useCallback(async () => {
+    if (!sharePreview) return;
+    setSendingPreview(true);
+    const { channel, attendee: a, subject, message } = sharePreview;
+    try {
+      if (channel === "email") {
+        const t = toast.loading(`Sending badge to ${a.email}…`);
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        if (!dataUrl) { toast.error("Failed to render badge image", { id: t }); return; }
+        const pngBase64 = dataUrl.split(",")[1];
+        const { data, error } = await supabase.functions.invoke("send-badge-email", {
+          body: {
+            attendeeId: a.id, attendeeEmail: a.email, attendeeName: a.name,
+            eventId, eventName, subject, message, pngBase64,
+            ticketId: a.ticket_id || a.id.slice(0, 12).toUpperCase(),
+            admits: a.admits || 1, role: a.role || "",
+          },
+        });
+        if (error || !(data as any)?.success) {
+          toast.error(`Failed: ${error?.message || (data as any)?.error || "Delivery failed"}`, { id: t });
+        } else {
+          toast.success(`Badge sent to ${a.email}`, { id: t });
+        }
+        fetchLogs();
+      } else if (channel === "whatsapp") {
+        // Render badge PNG → attempt to share file (so badge image is included)
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        let shared = false;
+        try {
+          if (dataUrl && (navigator as any).canShare) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+            if ((navigator as any).canShare({ files: [file] })) {
+              await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: message });
+              shared = true;
+            }
+          }
+        } catch {}
+        if (!shared) {
+          // Always download the badge PNG so the user can attach it in WhatsApp
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          const phone = (a.phone || "").replace(/[^\d]/g, "");
+          const url = phone
+            ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+            : `https://wa.me/?text=${encodeURIComponent(message)}`;
+          window.open(url, "_blank");
+          toast.success("Badge downloaded — attach it in WhatsApp");
+        }
+        await logShareAttempt(a, "whatsapp", a.phone || null, "sent", null, null);
+      } else if (channel === "instagram") {
+        const dataUrl = await renderAttendeeBadgePng(a) || await renderBadgePngDataUrl();
+        let shared = false;
+        try {
+          if (dataUrl && (navigator as any).canShare) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `badge-${a.name}.png`, { type: "image/png" });
+            if ((navigator as any).canShare({ files: [file] })) {
+              await (navigator as any).share({ files: [file], title: `Badge — ${a.name}`, text: message });
+              shared = true;
+            }
+          }
+        } catch {}
+        if (!shared) {
+          try { await navigator.clipboard.writeText(message); } catch {}
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          window.open("https://www.instagram.com/", "_blank");
+          toast.success("Badge downloaded & caption copied");
+        }
+        await logShareAttempt(a, "instagram", null, "sent", null, null);
+      }
+      setSharePreview(null);
+    } catch (err: any) {
+      toast.error(`Share failed: ${err.message || err}`);
+      if (sharePreview.channel !== "email") {
+        await logShareAttempt(sharePreview.attendee, sharePreview.channel, null, "failed", String(err?.message || err), null);
+      }
+    } finally {
+      setSendingPreview(false);
+    }
+  }, [sharePreview, eventId, eventName, renderAttendeeBadgePng, renderBadgePngDataUrl, fetchLogs, logShareAttempt]);
+
+  // Compute filtered targets for "Share All"
+  const shareAllTargets = useCallback(() => {
+    return attendees.filter((a) => {
+      if (shareAllFilter.requireEmail && !a.email) return false;
+      if (shareAllFilter.requirePhone && !a.phone) return false;
+      if (shareAllChannel === "email" && !a.email) return false;
+      if (shareAllChannel === "whatsapp" && !a.phone) return false;
+      return true;
+    });
+  }, [attendees, shareAllFilter, shareAllChannel]);
+
+  // SHARE ALL — bulk send via selected channel with recipient filter
+  const handleShareAllConfirm = useCallback(async () => {
+    const targets = shareAllTargets();
+    if (targets.length === 0) { toast.error("No attendees match the selected filter."); return; }
+    setShareAllOpen(false);
     setShareAllProgress({ current: 0, total: targets.length, sent: 0, failed: 0 });
     let sent = 0, failed = 0;
     for (let i = 0; i < targets.length; i++) {
       const a = targets[i];
-      const res = await sendBadgeEmail(a);
-      if (res.ok) sent++; else failed++;
+      try {
+        if (shareAllChannel === "email") {
+          const res = await sendBadgeEmail(a);
+          if (res.ok) sent++; else failed++;
+        } else if (shareAllChannel === "whatsapp") {
+          // Open WhatsApp link per attendee (user must attach badge PNG manually — so we also download it)
+          const dataUrl = await renderAttendeeBadgePng(a);
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          const phone = (a.phone || "").replace(/[^\d]/g, "");
+          const message = applyVars(templates.whatsappBody, ctxFor(a));
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+          await logShareAttempt(a, "whatsapp", a.phone || null, "sent", null, null);
+          sent++;
+        } else if (shareAllChannel === "instagram") {
+          const dataUrl = await renderAttendeeBadgePng(a);
+          if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `badge-${a.name.replace(/\s+/g, "-")}.png`;
+            link.click();
+          }
+          await logShareAttempt(a, "instagram", null, "sent", null, null);
+          sent++;
+        }
+      } catch (err: any) {
+        failed++;
+      }
       setShareAllProgress({ current: i + 1, total: targets.length, sent, failed });
     }
     toast[failed === 0 ? "success" : "warning"](`Bulk send complete: ${sent} sent, ${failed} failed`);
     setShareAllProgress(null);
     fetchLogs();
     setShowLog(true);
-  }, [attendees, sendBadgeEmail, fetchLogs]);
+  }, [shareAllTargets, shareAllChannel, sendBadgeEmail, renderAttendeeBadgePng, templates, ctxFor, logShareAttempt, fetchLogs]);
 
   // Retry a failed log entry
   const handleRetry = useCallback(async (log: ShareLog) => {
@@ -444,7 +592,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           <Button
             variant="outline"
             size="sm"
-            onClick={handleShareAllEmails}
+            onClick={() => setShareAllOpen(true)}
             disabled={!!shareAllProgress}
             className="text-primary"
           >
@@ -488,7 +636,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
             className="flex items-center justify-between w-full text-sm font-medium text-foreground"
           >
             <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-primary" /> Email Delivery Status
+              <Mail className="h-4 w-4 text-primary" /> Delivery Status (Email · WhatsApp · Instagram)
               {logs.length > 0 && (
                 <>
                   <Badge variant="secondary" className="text-[10px]">{logs.filter((l) => l.status === "sent").length} sent</Badge>
@@ -518,7 +666,9 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">
-                          {att?.name || "Unknown"} <span className="text-muted-foreground font-normal">· {log.recipient}</span>
+                          {att?.name || "Unknown"}{" "}
+                          <Badge variant="outline" className="text-[10px] ml-1 capitalize">{log.channel}</Badge>
+                          {log.recipient && <span className="text-muted-foreground font-normal"> · {log.recipient}</span>}
                         </p>
                         <p className="text-muted-foreground truncate">
                           {log.status === "failed" ? (
@@ -791,6 +941,135 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           </div>
         )}
       </div>
+
+      {/* Share All — recipient filter dialog */}
+      <Dialog open={shareAllOpen} onOpenChange={setShareAllOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2"><Filter className="h-4 w-4" /> Share All Badges</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Channel</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["email", "whatsapp", "instagram"] as const).map((ch) => (
+                  <Button
+                    key={ch}
+                    variant={shareAllChannel === ch ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShareAllChannel(ch)}
+                    className="capitalize"
+                  >
+                    {ch === "email" && <Mail className="h-3.5 w-3.5 mr-1" />}
+                    {ch === "whatsapp" && <MessageCircle className="h-3.5 w-3.5 mr-1" />}
+                    {ch === "instagram" && <Instagram className="h-3.5 w-3.5 mr-1" />}
+                    {ch}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Recipient filter</Label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={shareAllFilter.requireEmail}
+                  onCheckedChange={(v) => setShareAllFilter((p) => ({ ...p, requireEmail: !!v }))}
+                />
+                Only attendees with email on file
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={shareAllFilter.requirePhone}
+                  onCheckedChange={(v) => setShareAllFilter((p) => ({ ...p, requirePhone: !!v }))}
+                />
+                Only attendees with phone (for WhatsApp)
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Attendees missing the required contact info are excluded automatically.
+                The badge PNG is included with every send.
+              </p>
+            </div>
+
+            <div className="rounded-md bg-muted/50 p-3 text-xs">
+              <p className="font-medium text-foreground">
+                {shareAllTargets().length} of {attendees.length} attendees will receive their badge
+              </p>
+              <p className="text-muted-foreground mt-1">
+                {attendees.length - shareAllTargets().length} excluded by filter
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShareAllOpen(false)}>Cancel</Button>
+              <Button
+                className="flex-1 gradient-sunset text-primary-foreground"
+                onClick={handleShareAllConfirm}
+                disabled={shareAllTargets().length === 0}
+              >
+                <Send className="h-4 w-4 mr-1" /> Send to {shareAllTargets().length}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-attendee share preview — confirm subject/message before sending */}
+      <Dialog open={!!sharePreview} onOpenChange={(open) => !open && setSharePreview(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Eye className="h-4 w-4" /> Preview {sharePreview?.channel === "email" ? "Email" : sharePreview?.channel === "whatsapp" ? "WhatsApp" : "Instagram"}
+            </DialogTitle>
+          </DialogHeader>
+          {sharePreview && (
+            <div className="space-y-3">
+              <div className="rounded-md bg-muted/50 p-3 text-xs">
+                <p><span className="text-muted-foreground">To:</span>{" "}
+                  <span className="font-medium text-foreground">{sharePreview.attendee.name}</span>
+                  {sharePreview.channel === "email" && sharePreview.attendee.email && (
+                    <span className="text-muted-foreground"> · {sharePreview.attendee.email}</span>
+                  )}
+                  {sharePreview.channel === "whatsapp" && (
+                    <span className="text-muted-foreground"> · {sharePreview.attendee.phone || "no phone — will open WhatsApp web"}</span>
+                  )}
+                </p>
+                <p className="text-muted-foreground mt-1">Badge PNG will be attached/downloaded automatically.</p>
+              </div>
+
+              {sharePreview.channel === "email" && (
+                <div className="space-y-1">
+                  <Label className="text-sm">Subject</Label>
+                  <Input
+                    value={sharePreview.subject}
+                    onChange={(e) => setSharePreview((p) => p ? { ...p, subject: e.target.value } : p)}
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-sm">{sharePreview.channel === "instagram" ? "Caption" : "Message"}</Label>
+                <Textarea
+                  rows={sharePreview.channel === "email" ? 8 : 5}
+                  value={sharePreview.message}
+                  onChange={(e) => setSharePreview((p) => p ? { ...p, message: e.target.value } : p)}
+                />
+                <p className="text-[10px] text-muted-foreground">Variables already resolved for this attendee.</p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setSharePreview(null)} disabled={sendingPreview}>Cancel</Button>
+                <Button
+                  className="flex-1 gradient-sunset text-primary-foreground"
+                  onClick={confirmSharePreview}
+                  disabled={sendingPreview}
+                >
+                  {sendingPreview ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Sending…</> : <><Send className="h-4 w-4 mr-1" /> Confirm & Send</>}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
