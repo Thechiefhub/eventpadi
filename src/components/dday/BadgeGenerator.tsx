@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Eye, Filter } from "lucide-react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
