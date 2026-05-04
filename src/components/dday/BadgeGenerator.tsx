@@ -592,7 +592,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           <Button
             variant="outline"
             size="sm"
-            onClick={handleShareAllEmails}
+            onClick={() => setShareAllOpen(true)}
             disabled={!!shareAllProgress}
             className="text-primary"
           >
