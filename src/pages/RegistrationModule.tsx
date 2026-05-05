@@ -110,7 +110,7 @@ export default function RegistrationModule() {
     setAiBusy("desc");
     try {
       const { data, error } = await supabase.functions.invoke("reg-ai-assist", {
-        body: { mode: "description", title: page.title, theme: page.description || selectedEvent?.theme_statement || "", location: page.location || "", audience: selectedEvent?.event_type || "" },
+        body: { mode: "description", title: page.title, theme: page.description || (selectedEvent as any)?.theme_statement || "", location: page.location || "", audience: (selectedEvent as any)?.event_type || "" },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
