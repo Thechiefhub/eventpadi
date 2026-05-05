@@ -12,8 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ClipboardList, Copy, ExternalLink, Globe, Image as ImageIcon, Loader2, Save, Sparkles, Ticket, Users, Eye, EyeOff } from "lucide-react";
+import { ClipboardList, Copy, ExternalLink, Globe, Image as ImageIcon, Loader2, Save, Sparkles, Ticket, Users, Eye, EyeOff, Pencil, Trash2, CheckCircle2, Wand2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { downloadTicketPdf, buildQrPayload } from "@/lib/ticket";
 
 interface RegPage {
   id: string;
@@ -51,6 +54,7 @@ interface Registration {
   amount: number | null;
   payment_status: string;
   created_at: string;
+  attendee_id?: string | null;
 }
 
 const slugify = (s: string) =>
@@ -65,6 +69,11 @@ export default function RegistrationModule() {
   const [saving, setSaving] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [aiBusy, setAiBusy] = useState<null | "desc" | "perks">(null);
+  const [perks, setPerks] = useState<{ general: string[]; vip: string[]; vvip: string[] } | null>(null);
+  const [editing, setEditing] = useState<Registration | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Registration>>({});
+  const [confirmDelete, setConfirmDelete] = useState<Registration | null>(null);
 
   useEffect(() => {
     if (!selectedEventId || !user) return;
@@ -78,7 +87,7 @@ export default function RegistrationModule() {
       setPage(data as RegPage | null);
       const { data: regs } = await supabase
         .from("event_registrations")
-        .select("id,name,email,phone,ticket_tier,admits,amount,payment_status,created_at")
+        .select("id,name,email,phone,ticket_tier,admits,amount,payment_status,created_at,attendee_id")
         .eq("event_id", selectedEventId)
         .order("created_at", { ascending: false });
       setRegistrations((regs as Registration[]) || []);
@@ -86,6 +95,91 @@ export default function RegistrationModule() {
     };
     load();
   }, [selectedEventId, user]);
+
+  const refreshRegistrations = async () => {
+    const { data: regs } = await supabase
+      .from("event_registrations")
+      .select("id,name,email,phone,ticket_tier,admits,amount,payment_status,created_at,attendee_id")
+      .eq("event_id", selectedEventId)
+      .order("created_at", { ascending: false });
+    setRegistrations((regs as Registration[]) || []);
+  };
+
+  const generateAiDescription = async () => {
+    if (!page) return;
+    setAiBusy("desc");
+    try {
+      const { data, error } = await supabase.functions.invoke("reg-ai-assist", {
+        body: { mode: "description", title: page.title, theme: page.description || selectedEvent?.theme_statement || "", location: page.location || "", audience: selectedEvent?.event_type || "" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      update({ description: (data as any).description });
+      toast.success("AI description ready — review and save");
+    } catch (e: any) { toast.error(e.message || "AI failed"); }
+    finally { setAiBusy(null); }
+  };
+
+  const generateAiPerks = async () => {
+    if (!page) return;
+    setAiBusy("perks");
+    try {
+      const { data, error } = await supabase.functions.invoke("reg-ai-assist", {
+        body: { mode: "perks", title: page.title, theme: page.description || "", location: page.location || "" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setPerks(data as any);
+      toast.success("Perk ideas generated");
+    } catch (e: any) { toast.error(e.message || "AI failed"); }
+    finally { setAiBusy(null); }
+  };
+
+  const openEdit = (r: Registration) => {
+    setEditing(r);
+    setEditForm({ name: r.name, email: r.email, phone: r.phone, ticket_tier: r.ticket_tier, admits: r.admits, payment_status: r.payment_status });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const { error } = await supabase.from("event_registrations").update({
+      name: editForm.name, email: editForm.email, phone: editForm.phone,
+      ticket_tier: editForm.ticket_tier, admits: editForm.admits, payment_status: editForm.payment_status,
+    }).eq("id", editing.id);
+    if (error) return toast.error(error.message);
+    toast.success("Registration updated — synced to attendee");
+    setEditing(null); refreshRegistrations();
+  };
+
+  const markPaid = async (r: Registration) => {
+    const { error } = await supabase.from("event_registrations").update({ payment_status: "paid" }).eq("id", r.id);
+    if (error) return toast.error(error.message);
+    toast.success("Marked as paid");
+    refreshRegistrations();
+  };
+
+  const cancelRegistration = async () => {
+    if (!confirmDelete) return;
+    const { error } = await supabase.from("event_registrations").delete().eq("id", confirmDelete.id);
+    if (error) return toast.error(error.message);
+    toast.success("Cancelled — attendee removed");
+    setConfirmDelete(null); refreshRegistrations();
+  };
+
+  const downloadTicket = async (r: Registration) => {
+    let ticketRef = "";
+    if (r.attendee_id) {
+      const { data: att } = await supabase.from("attendees").select("ticket_id").eq("id", r.attendee_id).maybeSingle();
+      ticketRef = att?.ticket_id || "";
+    }
+    if (!ticketRef) ticketRef = `REG-${r.id.slice(0, 8).toUpperCase()}`;
+    await downloadTicketPdf({
+      ticketRef, name: r.name, tier: r.ticket_tier, admits: r.admits,
+      eventTitle: page!.title, eventDate: page!.start_at,
+      location: [page!.venue_address, page!.location].filter(Boolean).join(", "),
+      qrPayload: buildQrPayload({ ticketRef, eventId: page!.event_id, registrationId: r.id }),
+    });
+  };
 
   const ensureDraft = (): RegPage => {
     if (page) return page;
@@ -249,7 +343,11 @@ export default function RegistrationModule() {
 
               <div className="space-y-1.5">
                 <Label>About this event</Label>
-                <Textarea rows={4} value={page.description || ""} onChange={(e) => update({ description: e.target.value })} placeholder="Tell attendees what to expect, who should attend, agenda highlights..." maxLength={2000} />
+                <Textarea rows={5} value={page.description || ""} onChange={(e) => update({ description: e.target.value })} placeholder="Tell attendees what to expect, who should attend, agenda highlights..." maxLength={2000} />
+                <Button type="button" size="sm" variant="outline" onClick={generateAiDescription} disabled={aiBusy === "desc" || !page.title}>
+                  {aiBusy === "desc" ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Wand2 className="mr-1 h-3.5 w-3.5" />}
+                  Generate with AI
+                </Button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -359,9 +457,20 @@ export default function RegistrationModule() {
                         <Input type="number" min={0} step="0.01" value={(page[priceKey] as number) ?? 0} onChange={(e) => update({ [priceKey]: parseFloat(e.target.value) || 0 } as any)} />
                       </div>
                     )}
+                    {perks?.[t.key as "general" | "vip" | "vvip"]?.length ? (
+                      <ul className="space-y-1 rounded-md bg-muted/30 p-2 text-xs">
+                        {perks[t.key as "general" | "vip" | "vvip"].map((p, i) => (
+                          <li key={i} className="flex gap-1"><CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-primary" /><span>{p}</span></li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 );
               })}
+              <Button type="button" variant="outline" size="sm" onClick={generateAiPerks} disabled={aiBusy === "perks"}>
+                {aiBusy === "perks" ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                AI: explain tier perks
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -384,7 +493,8 @@ export default function RegistrationModule() {
                       <TableHead>Tier</TableHead>
                       <TableHead>Admits</TableHead>
                       <TableHead>Contact</TableHead>
-                      <TableHead>When</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -394,7 +504,17 @@ export default function RegistrationModule() {
                         <TableCell><Badge variant={r.ticket_tier === "vvip" ? "default" : r.ticket_tier === "vip" ? "secondary" : "outline"}>{r.ticket_tier.toUpperCase()}</Badge></TableCell>
                         <TableCell>{r.admits}</TableCell>
                         <TableCell className="text-xs">{r.email || r.phone || "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
+                        <TableCell><Badge variant={r.payment_status === "paid" ? "default" : "outline"} className="text-[10px]">{r.payment_status}</Badge></TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" title="Download ticket" onClick={() => downloadTicket(r)}><Download className="h-3.5 w-3.5" /></Button>
+                            <Button size="icon" variant="ghost" title="Edit" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
+                            {r.payment_status !== "paid" && page.is_paid && (
+                              <Button size="icon" variant="ghost" title="Mark paid" onClick={() => markPaid(r)}><CheckCircle2 className="h-3.5 w-3.5 text-primary" /></Button>
+                            )}
+                            <Button size="icon" variant="ghost" title="Cancel" onClick={() => setConfirmDelete(r)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -418,6 +538,63 @@ export default function RegistrationModule() {
           <Button className="gradient-sunset text-primary-foreground" disabled={saving} onClick={() => save(true)}><Eye className="mr-1 h-4 w-4" />Publish</Button>
         )}
       </div>
+
+      {/* Edit registration dialog */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit registration</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Name</Label><Input value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label>Email</Label><Input value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Phone</Label><Input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Tier</Label>
+                <Select value={editForm.ticket_tier} onValueChange={(v) => setEditForm({ ...editForm, ticket_tier: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="vip">VIP</SelectItem>
+                    <SelectItem value="vvip">VVIP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Admits</Label><Input type="number" min={1} value={editForm.admits || 1} onChange={(e) => setEditForm({ ...editForm, admits: parseInt(e.target.value) || 1 })} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Payment status</Label>
+              <Select value={editForm.payment_status} onValueChange={(v) => setEditForm({ ...editForm, payment_status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this registration?</AlertDialogTitle>
+            <AlertDialogDescription>This removes <strong>{confirmDelete?.name}</strong> from registrations and the D-Day attendee list. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={cancelRegistration}>Yes, cancel</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
