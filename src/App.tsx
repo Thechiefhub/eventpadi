@@ -23,6 +23,7 @@ import AdminPage from "./pages/AdminPage";
 import ResetPassword from "./pages/ResetPassword";
 import RegistrationModule from "./pages/RegistrationModule";
 import PublicRegistration from "./pages/PublicRegistration";
+import QRScannerPage from "./pages/QRScannerPage";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/certificate" element={<CertificateLookup />} />
             <Route path="/r/:slug" element={<PublicRegistration />} />
+            <Route path="/scan/:eventId" element={<ProtectedRoute><QRScannerPage /></ProtectedRoute>} />
             <Route
               path="/dashboard"
               element={
