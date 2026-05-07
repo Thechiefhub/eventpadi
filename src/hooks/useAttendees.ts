@@ -82,16 +82,25 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
   const checkIn = useCallback(async (attendeeId: string) => {
     if (!user) return false;
     const now = new Date().toISOString();
+    // Prevent duplicate check-ins (client-side guard)
+    const existing = attendees.find((a) => a.id === attendeeId);
+    if (existing?.checked_in) {
+      toast.info(`${existing.name} is already checked in`);
+      return false;
+    }
     // Optimistic update
     setAttendees((prev) =>
       prev.map((a) =>
         a.id === attendeeId ? { ...a, checked_in: true, checked_in_at: now, checked_in_by: user.id } : a
       )
     );
-    const { error } = await supabase
+    // Atomic update — only succeeds if not already checked in
+    const { data: updated, error } = await supabase
       .from("attendees")
       .update({ checked_in: true, checked_in_at: now, checked_in_by: user.id })
-      .eq("id", attendeeId);
+      .eq("id", attendeeId)
+      .eq("checked_in", false)
+      .select("id");
     if (error) {
       // Queue for offline sync
       try {
@@ -100,6 +109,10 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
         localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
       } catch {}
       toast.error("Check-in queued — will sync when online");
+      return false;
+    }
+    if (!updated || updated.length === 0) {
+      toast.info("Already checked in");
       return false;
     }
     toast.success("Checked in!");
