@@ -25,6 +25,16 @@ export default function DDayDashboard({ attendees, isAdmin = false, onCheckIn, o
   const remaining = total - checkedIn;
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
 
+  // Tier breakdown — match the labels created by sync_registration_to_attendee
+  const tierStats = useMemo(() => {
+    const tiers = ["General", "VIP", "VVIP"] as const;
+    return tiers.map((label) => {
+      const list = attendees.filter((a) => (a.role || "").toLowerCase() === label.toLowerCase());
+      const ci = list.filter((a) => a.checked_in).length;
+      return { label, total: list.length, checkedIn: ci };
+    });
+  }, [attendees]);
+
   // Build check-in over time chart data (cumulative, bucketed by minute)
   const chartData = useMemo(() => {
     const checkedInList = attendees
@@ -83,6 +93,33 @@ export default function DDayDashboard({ attendees, isAdmin = false, onCheckIn, o
           </Card>
         ))}
       </div>
+
+      {/* Tier breakdown */}
+      {tierStats.some((t) => t.total > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-display">Check-in by Tier</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 grid grid-cols-3 gap-3">
+            {tierStats.map((t) => {
+              const tierPct = t.total > 0 ? Math.round((t.checkedIn / t.total) * 100) : 0;
+              const color =
+                t.label === "VVIP" ? "text-[hsl(var(--sunset-gold))]"
+                : t.label === "VIP" ? "text-[hsl(var(--kente-red))]"
+                : "text-primary";
+              return (
+                <div key={t.label} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <span className={`text-xs font-bold uppercase tracking-wide ${color}`}>{t.label}</span>
+                    <span className="text-xs text-muted-foreground">{t.checkedIn}/{t.total}</span>
+                  </div>
+                  <Progress value={tierPct} className="h-2" />
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Check-In Search */}
       {onCheckIn && onUndoCheckIn && (

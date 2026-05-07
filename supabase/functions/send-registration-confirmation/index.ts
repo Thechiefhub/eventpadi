@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json();
-    const { registrationId, name, email, phone, ticketTier, admits, ticketRef, eventTitle, eventDate, location, registrationUrl } = body;
+    const { registrationId, name, email, phone, ticketTier, admits, ticketRef, eventTitle, eventDate, location, registrationUrl, eventId } = body;
     if (!registrationId || !name || !ticketRef || !eventTitle) {
       return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -30,6 +30,10 @@ Deno.serve(async (req) => {
     const tierLabel = String(ticketTier || "general").toUpperCase();
     const admitsN = Number(admits || 1);
     const dateStr = eventDate ? new Date(eventDate).toLocaleString() : "";
+    // Encode the same QR payload buildQrPayload uses on the client so the
+    // QR in the email is identical to the printed/PDF QR.
+    const qrPayload = JSON.stringify({ t: ticketRef, e: eventId || "", r: registrationId });
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrPayload)}`;
     const subject = `🎟 You're confirmed for ${eventTitle}`;
     const text = [
       `Hi ${name},`,
@@ -49,6 +53,10 @@ Deno.serve(async (req) => {
       <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:28px;border:1px solid #eee;">
         <h2 style="margin:0 0 8px;color:#0f172a;">${escapeHtml(eventTitle)}</h2>
         <p style="color:#475569;margin:0 0 16px;">You're confirmed, ${escapeHtml(name)} — see you soon.</p>
+        <div style="text-align:center;margin:8px 0 18px;">
+          <img src="${qrUrl}" alt="Your check-in QR code" width="220" height="220" style="border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#fff;" />
+          <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;">Show this QR at the door for instant check-in</p>
+        </div>
         <table style="width:100%;border-collapse:collapse;font-size:14px;color:#0f172a;">
           <tr><td style="padding:6px 0;color:#64748b;">Tier</td><td style="padding:6px 0;text-align:right;font-weight:600;">${escapeHtml(tierLabel)}</td></tr>
           <tr><td style="padding:6px 0;color:#64748b;">Admits</td><td style="padding:6px 0;text-align:right;font-weight:600;">${admitsN}</td></tr>

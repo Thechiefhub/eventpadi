@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.send-registration-confirmation]
 verify_jwt = false
+
+[functions.qr-check-in]
+verify_jwt = false
+
+[functions.send-announcement]
+verify_jwt = false

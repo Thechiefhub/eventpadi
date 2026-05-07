@@ -96,6 +96,7 @@ export default function PublicRegistration() {
       const { data: c } = await supabase.functions.invoke("send-registration-confirmation", {
         body: {
           registrationId: data.id,
+          eventId: page.event_id,
           name: data.name,
           email: data.email,
           phone: data.phone,
