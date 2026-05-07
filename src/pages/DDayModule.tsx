@@ -15,7 +15,7 @@
  * Real-time: All stats update live across all logged-in team members via WebSockets.
  */
 
-import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award, Trash2, Loader2 } from "lucide-react";
+import { CalendarCheck, UserCheck, Users, Shield, QrCode, Award, Trash2, Loader2, Megaphone, ScanLine } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ import AttendeeUpload from "@/components/dday/AttendeeUpload";
 import TeamManager from "@/components/dday/TeamManager";
 import BadgeGenerator from "@/components/dday/BadgeGenerator";
 import CertificateSettings from "@/components/dday/CertificateSettings";
+import AnnouncementBroadcaster from "@/components/dday/AnnouncementBroadcaster";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function DDayModule() {
@@ -115,12 +117,17 @@ export default function DDayModule() {
               </AlertDialogContent>
             </AlertDialog>
           )}
+          {selectedEvent && (
+            <Button asChild size="sm" className="gradient-sunset text-primary-foreground shrink-0">
+              <Link to={`/scan/${selectedEvent.id}`}><ScanLine className="mr-1 h-4 w-4" />Scan</Link>
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid grid-cols-6 w-full">
+        <TabsList className="grid grid-cols-7 w-full">
           <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
             <Users className="h-4 w-4 mr-1 hidden sm:inline" /> Dashboard
           </TabsTrigger>
@@ -135,6 +142,9 @@ export default function DDayModule() {
           </TabsTrigger>
           <TabsTrigger value="certificates" className="text-xs sm:text-sm">
             <Award className="h-4 w-4 mr-1 hidden sm:inline" /> Certs
+          </TabsTrigger>
+          <TabsTrigger value="announce" className="text-xs sm:text-sm">
+            <Megaphone className="h-4 w-4 mr-1 hidden sm:inline" /> Announce
           </TabsTrigger>
           <TabsTrigger value="team" className="text-xs sm:text-sm">
             <Shield className="h-4 w-4 mr-1 hidden sm:inline" /> Team
@@ -168,6 +178,14 @@ export default function DDayModule() {
             eventName={selectedEvent?.name || ""}
             eventDate={selectedEvent?.event_date}
             eventLocation={[selectedEvent?.city, selectedEvent?.country].filter(Boolean).join(", ") || null}
+            attendees={attendees}
+          />
+        </TabsContent>
+
+        <TabsContent value="announce" className="mt-4">
+          <AnnouncementBroadcaster
+            eventId={selectedEventId}
+            eventName={selectedEvent?.name || ""}
             attendees={attendees}
           />
         </TabsContent>
