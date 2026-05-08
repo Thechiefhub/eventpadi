@@ -57,6 +57,20 @@
     --gradient-indigo: linear-gradient(135deg, hsl(225 45% 18%), hsl(225 55% 30%));
     --gradient-hero: linear-gradient(135deg, hsl(225 45% 12%), hsl(225 50% 20%), hsl(24 70% 30%));
 
+    /* Gen-Z vibrant accents */
+    --neon-pink: 330 95% 62%;
+    --neon-purple: 270 90% 65%;
+    --neon-cyan: 188 95% 55%;
+    --neon-lime: 84 90% 55%;
+
+    --gradient-genz: linear-gradient(135deg, hsl(330 95% 62%), hsl(270 90% 65%) 45%, hsl(24 95% 53%) 100%);
+    --gradient-aurora: linear-gradient(135deg, hsl(188 95% 55%), hsl(270 90% 65%) 50%, hsl(330 95% 62%));
+    --gradient-mesh: radial-gradient(at 18% 22%, hsl(330 95% 62% / 0.55) 0px, transparent 45%),
+                     radial-gradient(at 82% 18%, hsl(188 95% 55% / 0.5) 0px, transparent 45%),
+                     radial-gradient(at 70% 85%, hsl(270 90% 65% / 0.55) 0px, transparent 45%),
+                     radial-gradient(at 25% 80%, hsl(24 95% 53% / 0.5) 0px, transparent 45%);
+    --shadow-glow: 0 0 0 1px hsl(0 0% 100% / 0.06), 0 20px 60px -15px hsl(270 90% 65% / 0.45);
+
     --shadow-warm: 0 4px 20px -4px hsl(24 95% 53% / 0.2);
     --shadow-deep: 0 8px 32px -8px hsl(225 45% 18% / 0.3);
 
@@ -136,4 +150,41 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  .gradient-genz { background: var(--gradient-genz); }
+  .gradient-aurora { background: var(--gradient-aurora); }
+  .text-gradient-genz {
+    background: var(--gradient-genz);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-aurora {
+    background: var(--gradient-aurora);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .bg-mesh {
+    background-color: hsl(var(--background));
+    background-image: var(--gradient-mesh);
+  }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .glass {
+    background: hsl(var(--card) / 0.65);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  .ring-genz { box-shadow: 0 0 0 2px hsl(330 95% 62% / 0.35), 0 0 0 6px hsl(270 90% 65% / 0.2); }
+  @keyframes blob {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(30px,-20px) scale(1.08); }
+    66% { transform: translate(-25px,15px) scale(0.95); }
+  }
+  .animate-blob { animation: blob 14s ease-in-out infinite; }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-marquee { animation: marquee 28s linear infinite; }
 }
