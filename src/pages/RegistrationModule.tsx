@@ -17,6 +17,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { downloadTicketPdf, buildQrPayload } from "@/lib/ticket";
+import NewEventDialog from "@/components/NewEventDialog";
+import { format } from "date-fns";
+import { CalendarDays, MapPin, Plus } from "lucide-react";
 
 interface RegPage {
   id: string;
@@ -74,6 +77,8 @@ export default function RegistrationModule() {
   const [editing, setEditing] = useState<Registration | null>(null);
   const [editForm, setEditForm] = useState<Partial<Registration>>({});
   const [confirmDelete, setConfirmDelete] = useState<Registration | null>(null);
+  const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<{ id: string; name: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!selectedEventId || !user) return;
@@ -94,7 +99,7 @@ export default function RegistrationModule() {
       setLoading(false);
     };
     load();
-  }, [selectedEventId, user]);
+  }, [selectedEventId, user, reloadKey]);
 
   const refreshRegistrations = async () => {
     const { data: regs } = await supabase
@@ -273,10 +278,13 @@ export default function RegistrationModule() {
   if (eventsLoading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (events.length === 0) {
     return (
-      <div className="p-6 text-center">
-        <ClipboardList className="mx-auto mb-3 h-12 w-12 text-muted-foreground opacity-40" />
-        <p className="font-display text-lg">No events yet</p>
-        <p className="mt-1 text-sm text-muted-foreground">Create an event first to set up registration.</p>
+      <div className="mx-auto max-w-md p-8 text-center">
+        <div className="mx-auto mb-4 inline-flex rounded-2xl gradient-genz p-4 shadow-glow">
+          <ClipboardList className="h-8 w-8 text-primary-foreground" />
+        </div>
+        <p className="font-display text-xl font-bold">No events yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">Spin one up to start collecting registrations.</p>
+        <div className="mt-5 flex justify-center"><NewEventDialog /></div>
       </div>
     );
   }
@@ -284,17 +292,67 @@ export default function RegistrationModule() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4 md:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <ClipboardList className="h-6 w-6 text-primary" />
-          <h1 className="font-display text-xl font-bold md:text-2xl">Event Registration</h1>
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-mesh p-5 shadow-glow">
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Registration HQ</p>
+            <h1 className="font-display text-2xl font-bold md:text-3xl">
+              Build the <span className="text-gradient-genz">moment</span>.
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">Create events, drop sign-up links, and see RSVPs roll in.</p>
+          </div>
+          <NewEventDialog onCreated={() => window.location.reload()}>
+            <Button className="gradient-genz text-primary-foreground shadow-glow">
+              <Plus className="mr-1 h-4 w-4" /> New Event
+            </Button>
+          </NewEventDialog>
         </div>
-        <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-          <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {events.map((ev) => (<SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
+      </div>
+
+      {/* Events scroller */}
+      <div className="-mx-1 overflow-x-auto pb-1">
+        <div className="flex gap-3 px-1">
+          {events.map((ev) => {
+            const active = ev.id === selectedEventId;
+            return (
+              <button
+                key={ev.id}
+                onClick={() => setSelectedEventId(ev.id)}
+                className={`group relative w-[230px] shrink-0 rounded-xl border p-3 text-left transition-all ${
+                  active ? "border-transparent gradient-genz text-primary-foreground shadow-glow" : "border-border bg-card hover:-translate-y-0.5 hover:shadow-warm"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className={`line-clamp-2 font-display text-sm font-semibold ${active ? "text-primary-foreground" : "text-foreground"}`}>{ev.name}</p>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteEvent({ id: ev.id, name: ev.name }); }}
+                    className={`rounded-md p-1 ${active ? "bg-primary-foreground/20 text-primary-foreground" : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"}`}
+                    title="Delete event"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+                <div className={`mt-2 flex flex-wrap gap-2 text-[11px] ${active ? "text-primary-foreground/85" : "text-muted-foreground"}`}>
+                  {ev.event_date && (
+                    <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(new Date(ev.event_date), "MMM d")}</span>
+                  )}
+                  {(ev.city || ev.country) && (
+                    <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{[ev.city, ev.country].filter(Boolean).join(", ")}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+          <NewEventDialog onCreated={() => window.location.reload()}>
+            <button className="flex h-[88px] w-[140px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary">
+              <Plus className="h-5 w-5" />
+              <span className="text-xs font-medium">Add event</span>
+            </button>
+          </NewEventDialog>
+        </div>
       </div>
 
       {page.is_published && (
@@ -592,6 +650,29 @@ export default function RegistrationModule() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
             <AlertDialogAction onClick={cancelRegistration}>Yes, cancel</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmDeleteEvent} onOpenChange={(o) => !o && setConfirmDeleteEvent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{confirmDeleteEvent?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This permanently removes the event and all linked registrations, attendees, and the public link. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!confirmDeleteEvent) return;
+                const { error } = await supabase.from("events").delete().eq("id", confirmDeleteEvent.id);
+                if (error) return toast.error(error.message);
+                toast.success(`"${confirmDeleteEvent.name}" deleted`);
+                setConfirmDeleteEvent(null);
+                window.location.reload();
+              }}
+            >Delete event</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
