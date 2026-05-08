@@ -302,7 +302,7 @@ export default function RegistrationModule() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">Create events, drop sign-up links, and see RSVPs roll in.</p>
           </div>
-          <NewEventDialog onCreated={() => setReloadKey((k) => k + 1)}>
+          <NewEventDialog onCreated={() => window.location.reload()}>
             <Button className="gradient-genz text-primary-foreground shadow-glow">
               <Plus className="mr-1 h-4 w-4" /> New Event
             </Button>
@@ -346,7 +346,7 @@ export default function RegistrationModule() {
               </button>
             );
           })}
-          <NewEventDialog onCreated={() => setReloadKey((k) => k + 1)}>
+          <NewEventDialog onCreated={() => window.location.reload()}>
             <button className="flex h-[88px] w-[140px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary">
               <Plus className="h-5 w-5" />
               <span className="text-xs font-medium">Add event</span>
