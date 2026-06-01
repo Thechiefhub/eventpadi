@@ -18,6 +18,7 @@ export interface Attendee {
   certificate_url: string | null;
   admits: number;
   certificate_sent_at: string | null;
+  check_in_notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +80,7 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
   }, [eventId]);
 
   // Check-in function with offline queue
-  const checkIn = useCallback(async (attendeeId: string) => {
+  const checkIn = useCallback(async (attendeeId: string, notes?: string) => {
     if (!user) return false;
     const now = new Date().toISOString();
     // Prevent duplicate check-ins (client-side guard)
@@ -88,16 +89,17 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
       toast.info(`${existing.name} is already checked in`);
       return false;
     }
+    const trimmedNotes = notes?.trim() ? notes.trim().slice(0, 280) : null;
     // Optimistic update
     setAttendees((prev) =>
       prev.map((a) =>
-        a.id === attendeeId ? { ...a, checked_in: true, checked_in_at: now, checked_in_by: user.id } : a
+        a.id === attendeeId ? { ...a, checked_in: true, checked_in_at: now, checked_in_by: user.id, check_in_notes: trimmedNotes } : a
       )
     );
     // Atomic update — only succeeds if not already checked in
     const { data: updated, error } = await supabase
       .from("attendees")
-      .update({ checked_in: true, checked_in_at: now, checked_in_by: user.id })
+      .update({ checked_in: true, checked_in_at: now, checked_in_by: user.id, check_in_notes: trimmedNotes })
       .eq("id", attendeeId)
       .eq("checked_in", false)
       .select("id");
