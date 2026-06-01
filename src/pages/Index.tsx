@@ -1,6 +1,15 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, Handshake, Megaphone, Settings, ArrowRight, Sparkles, Globe, Wifi, Smartphone, ClipboardList, CalendarCheck, Star, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  ArrowRight, Sparkles, Star, Zap, CalendarDays, MapPin, Ticket, Search,
+  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 
 const modules = [
   { icon: ClipboardList, title: "Registration", desc: "Drop a public sign-up link with tickets, AI copy & QR codes.", grad: "gradient-aurora" },
@@ -12,6 +21,41 @@ const modules = [
 ];
 
 const Index = () => {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("event_registration_pages")
+        .select("id, slug, title, description, flyer_url, location, start_at, end_at, is_paid, currency, general_price, vip_price, vvip_price, general_enabled, vip_enabled, vvip_enabled")
+        .eq("is_published", true)
+        .order("start_at", { ascending: true, nullsFirst: false });
+      setEvents(data || []);
+      setLoadingEvents(false);
+    };
+    load();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((e) =>
+      [e.title, e.location, e.description].some((v) => v && String(v).toLowerCase().includes(q))
+    );
+  }, [events, query]);
+
+  const startingPrice = (e: any) => {
+    const prices: number[] = [];
+    if (e.general_enabled) prices.push(Number(e.general_price) || 0);
+    if (e.vip_enabled) prices.push(Number(e.vip_price) || 0);
+    if (e.vvip_enabled) prices.push(Number(e.vvip_price) || 0);
+    if (!e.is_paid || prices.length === 0 || Math.min(...prices) === 0) return "Free";
+    const min = Math.min(...prices.filter((p) => p > 0));
+    return `${e.currency || "NGN"} ${min.toLocaleString()}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -21,11 +65,14 @@ const Index = () => {
             My<span className="text-gradient-genz">event</span>
           </Link>
           <div className="flex items-center gap-3">
+            <a href="#events" className="hidden sm:inline text-sm font-medium text-muted-foreground hover:text-foreground transition">
+              Browse events
+            </a>
             <Button variant="ghost" asChild>
               <Link to="/auth">Login</Link>
             </Button>
             <Button asChild className="gradient-genz text-primary-foreground shadow-glow">
-              <Link to="/auth">Get Started <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              <Link to="/auth">Host an event <ArrowRight className="ml-1 h-4 w-4" /></Link>
             </Button>
           </div>
         </div>
@@ -38,31 +85,43 @@ const Index = () => {
         <div className="pointer-events-none absolute right-0 top-40 h-80 w-80 rounded-full bg-[hsl(var(--neon-cyan)/0.4)] blur-3xl animate-blob" style={{ animationDelay: "3s" }} />
         <div className="pointer-events-none absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-[hsl(var(--neon-purple)/0.45)] blur-3xl animate-blob" style={{ animationDelay: "6s" }} />
 
-        <div className="relative container flex flex-col items-center py-24 md:py-36 text-center">
+        <div className="relative container flex flex-col items-center py-20 md:py-28 text-center">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border/60 glass px-4 py-1.5 text-sm">
             <Sparkles className="h-4 w-4 text-[hsl(var(--neon-pink))]" />
-            <span className="font-medium">Your AI-powered event co-pilot</span>
+            <span className="font-medium">Discover & host Africa's hottest events</span>
           </div>
-          <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-foreground max-w-5xl leading-[1.05] animate-fade-up">
-            Throw events that <span className="text-gradient-genz">slap</span>.
-            <br className="hidden md:block" /> From <span className="text-gradient-aurora">spark</span> to <span className="text-gradient-sunset">showtime</span>.
+          <h1 className="font-display text-5xl md:text-7xl font-bold tracking-tight text-foreground max-w-5xl leading-[1.05] animate-fade-up">
+            Find your next <span className="text-gradient-genz">unforgettable</span> moment.
           </h1>
           <p className="mt-6 max-w-2xl text-lg md:text-xl text-muted-foreground animate-fade-up" style={{ animationDelay: "0.15s" }}>
-            Registration, sponsors, content, check-in — one bright dashboard.
-            Built for the next generation of African organizers.
+            Browse and register for live conferences, festivals, workshops and parties — all in one place.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-3 animate-fade-up" style={{ animationDelay: "0.3s" }}>
+
+          {/* Search */}
+          <div className="mt-8 w-full max-w-xl animate-fade-up" style={{ animationDelay: "0.25s" }}>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search events by name, city or vibe…"
+                className="h-14 pl-12 pr-4 text-base rounded-full glass border-border/60 shadow-warm"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 animate-fade-up" style={{ animationDelay: "0.35s" }}>
             <Button size="lg" className="gradient-genz text-primary-foreground shadow-glow text-base px-8 font-display font-semibold" asChild>
-              <Link to="/dashboard">Start Planning Free <ArrowRight className="ml-1 h-5 w-5" /></Link>
+              <a href="#events">Browse all events <ArrowRight className="ml-1 h-5 w-5" /></a>
             </Button>
             <Button size="lg" variant="outline" className="text-base px-8 border-2" asChild>
-              <Link to="/dashboard">See It Live</Link>
+              <Link to="/auth">Host your own</Link>
             </Button>
           </div>
 
           {/* Sticker badges */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-2 animate-fade-up" style={{ animationDelay: "0.45s" }}>
-            {["No-code setup", "QR check-in", "AI everywhere", "Mobile money", "Offline-first"].map((t) => (
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 animate-fade-up" style={{ animationDelay: "0.45s" }}>
+            {["Instant tickets", "QR check-in", "Free registration", "Mobile money", "Across Africa"].map((t) => (
               <span key={t} className="rounded-full border border-border/60 glass px-3 py-1 text-xs font-medium">{t}</span>
             ))}
           </div>
@@ -80,17 +139,113 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Live Events Listing */}
+      <section id="events" className="container py-20 md:py-24">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--neon-pink)/0.12)] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[hsl(var(--neon-pink))]">
+              <Star className="h-3 w-3" /> Happening now
+            </span>
+            <h2 className="mt-3 font-display text-4xl md:text-5xl font-bold text-foreground">
+              Live <span className="text-gradient-genz">events</span> on Myevent
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {loadingEvents ? "Loading…" : `${filtered.length} event${filtered.length === 1 ? "" : "s"} ready for you.`}
+            </p>
+          </div>
+        </div>
+
+        {loadingEvents ? (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-72 rounded-2xl bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="p-12 text-center space-y-3">
+              <CalendarCheck className="h-10 w-10 mx-auto text-muted-foreground" />
+              <h3 className="font-display text-xl font-semibold">No events yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                {query
+                  ? "Nothing matches that search. Try another keyword or browse all events."
+                  : "Be the first to publish a stunning event. It only takes a few minutes."}
+              </p>
+              <Button asChild className="gradient-genz text-primary-foreground mt-2">
+                <Link to="/auth">Host an event <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((e, i) => (
+              <Link
+                key={e.id}
+                to={`/r/${e.slug}`}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-glow animate-fade-up"
+                style={{ animationDelay: `${i * 0.05}s` }}
+              >
+                <div className="relative aspect-[16/10] overflow-hidden bg-mesh">
+                  {e.flyer_url ? (
+                    <img
+                      src={e.flyer_url}
+                      alt={e.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-full w-full gradient-aurora flex items-center justify-center">
+                      <CalendarCheck className="h-12 w-12 text-primary-foreground/80" />
+                    </div>
+                  )}
+                  <Badge className="absolute top-3 right-3 bg-background/90 text-foreground border border-border/60 backdrop-blur">
+                    <Ticket className="h-3 w-3 mr-1" /> {startingPrice(e)}
+                  </Badge>
+                </div>
+                <div className="p-5 space-y-2">
+                  <h3 className="font-display text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                    {e.title}
+                  </h3>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {e.start_at && (
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {format(new Date(e.start_at), "MMM d, yyyy")}
+                      </span>
+                    )}
+                    {e.location && (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span className="truncate max-w-[140px]">{e.location}</span>
+                      </span>
+                    )}
+                  </div>
+                  {e.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{e.description}</p>
+                  )}
+                  <div className="pt-2">
+                    <span className="inline-flex items-center text-sm font-semibold text-primary group-hover:gap-2 transition-all gap-1">
+                      Register now <ArrowRight className="h-4 w-4" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Modules */}
-      <section className="container py-20 md:py-28">
+      <section className="container py-16 md:py-20 border-t border-border/40">
         <div className="text-center mb-14">
           <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--neon-purple)/0.12)] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[hsl(var(--neon-purple))]">
-            <Zap className="h-3 w-3" /> The Stack
+            <Zap className="h-3 w-3" /> For organizers
           </span>
           <h2 className="mt-3 font-display text-4xl md:text-5xl font-bold text-foreground">
-            Six modules. <span className="text-gradient-genz">One vibe.</span>
+            Run your event like a <span className="text-gradient-genz">pro</span>.
           </h2>
           <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-            Every step from idea to encore — wired together, on autopilot.
+            Six modules — from naming, sponsors and content to QR check-in — on autopilot.
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">

@@ -19,6 +19,7 @@ export type Database = {
           admits: number
           certificate_sent_at: string | null
           certificate_url: string | null
+          check_in_notes: string | null
           checked_in: boolean
           checked_in_at: string | null
           checked_in_by: string | null
@@ -37,6 +38,7 @@ export type Database = {
           admits?: number
           certificate_sent_at?: string | null
           certificate_url?: string | null
+          check_in_notes?: string | null
           checked_in?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
@@ -55,6 +57,7 @@ export type Database = {
           admits?: number
           certificate_sent_at?: string | null
           certificate_url?: string | null
+          check_in_notes?: string | null
           checked_in?: boolean
           checked_in_at?: string | null
           checked_in_by?: string | null
