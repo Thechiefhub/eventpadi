@@ -389,6 +389,9 @@ const Index = () => {
             My<span className="text-gradient-sunset">event</span>
           </span>
           <p className="text-sm text-muted-foreground">© 2026 Myevent. Empowering African events.</p>
+          <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
+            Made with <Heart className="h-4 w-4 fill-red-500 text-red-500" aria-label="love" /> by <span className="font-semibold text-foreground">Chief Tolulope</span>
+          </p>
         </div>
       </footer>
     </div>
