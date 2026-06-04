@@ -29,6 +29,7 @@ const Index = () => {
   const [tierFilter, setTierFilter] = useState<string>("all"); // all | free | paid | vip | vvip
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [sort, setSort] = useState<string>("soonest"); // soonest | lowest_price | highest_tier
 
   useEffect(() => {
     const load = async () => {
