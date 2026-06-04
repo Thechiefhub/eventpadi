@@ -226,7 +226,7 @@ const Index = () => {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="pl-9 h-10" />
@@ -254,6 +254,17 @@ const Index = () => {
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10" aria-label="From date" />
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10" aria-label="To date" />
             </div>
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="h-10">
+                <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                <SelectItem value="soonest">Soonest date</SelectItem>
+                <SelectItem value="lowest_price">Lowest price</SelectItem>
+                <SelectItem value="highest_tier">Highest tier</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
