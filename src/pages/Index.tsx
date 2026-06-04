@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowRight, Sparkles, Star, Zap, CalendarDays, MapPin, Ticket, Search,
-  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone,
+  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone, Heart, Filter, X,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -24,6 +25,10 @@ const Index = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [query, setQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [tierFilter, setTierFilter] = useState<string>("all"); // all | free | paid | vip | vvip
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   useEffect(() => {
     const load = async () => {
@@ -38,13 +43,37 @@ const Index = () => {
     load();
   }, []);
 
+  const locations = useMemo(() => {
+    const set = new Set<string>();
+    events.forEach((e) => { if (e.location) set.add(String(e.location).trim()); });
+    return Array.from(set).sort();
+  }, [events]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return events;
-    return events.filter((e) =>
-      [e.title, e.location, e.description].some((v) => v && String(v).toLowerCase().includes(q))
-    );
-  }, [events, query]);
+    const from = dateFrom ? new Date(dateFrom).getTime() : null;
+    const to = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+    return events.filter((e) => {
+      if (q && ![e.title, e.location, e.description].some((v) => v && String(v).toLowerCase().includes(q))) return false;
+      if (locationFilter !== "all" && (e.location || "").trim() !== locationFilter) return false;
+      if (tierFilter === "free" && e.is_paid) return false;
+      if (tierFilter === "paid" && !e.is_paid) return false;
+      if (tierFilter === "vip" && !e.vip_enabled) return false;
+      if (tierFilter === "vvip" && !e.vvip_enabled) return false;
+      if (from || to) {
+        if (!e.start_at) return false;
+        const t = new Date(e.start_at).getTime();
+        if (from && t < from) return false;
+        if (to && t > to) return false;
+      }
+      return true;
+    });
+  }, [events, query, locationFilter, tierFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = locationFilter !== "all" || tierFilter !== "all" || !!dateFrom || !!dateTo || !!query.trim();
+  const clearFilters = () => {
+    setQuery(""); setLocationFilter("all"); setTierFilter("all"); setDateFrom(""); setDateTo("");
+  };
 
   const startingPrice = (e: any) => {
     const prices: number[] = [];
@@ -152,6 +181,48 @@ const Index = () => {
             <p className="mt-2 text-muted-foreground">
               {loadingEvents ? "Loading…" : `${filtered.length} event${filtered.length === 1 ? "" : "s"} ready for you.`}
             </p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-8 rounded-2xl border border-border/60 glass p-4 md:p-5">
+          <div className="flex items-center gap-2 mb-3 text-sm font-display font-semibold text-foreground">
+            <Filter className="h-4 w-4 text-[hsl(var(--neon-purple))]" />
+            Refine your search
+            {hasActiveFilters && (
+              <Button size="sm" variant="ghost" onClick={clearFilters} className="ml-auto h-7 text-xs">
+                <X className="h-3 w-3 mr-1" /> Clear all
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="relative lg:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="pl-9 h-10" />
+            </div>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="h-10"><SelectValue placeholder="Location" /></SelectTrigger>
+              <SelectContent className="bg-popover z-50 max-h-72">
+                <SelectItem value="all">All locations</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={tierFilter} onValueChange={setTierFilter}>
+              <SelectTrigger className="h-10"><SelectValue placeholder="Tier / Price" /></SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                <SelectItem value="all">All tickets</SelectItem>
+                <SelectItem value="free">Free only</SelectItem>
+                <SelectItem value="paid">Paid only</SelectItem>
+                <SelectItem value="vip">Has VIP</SelectItem>
+                <SelectItem value="vvip">Has VVIP</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10" aria-label="From date" />
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10" aria-label="To date" />
+            </div>
           </div>
         </div>
 
@@ -318,6 +389,9 @@ const Index = () => {
             My<span className="text-gradient-sunset">event</span>
           </span>
           <p className="text-sm text-muted-foreground">© 2026 Myevent. Empowering African events.</p>
+          <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
+            Made with <Heart className="h-4 w-4 fill-red-500 text-red-500" aria-label="love" /> by <span className="font-semibold text-foreground">Chief Tolulope</span>
+          </p>
         </div>
       </footer>
     </div>
