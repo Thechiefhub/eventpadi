@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowRight, Sparkles, Star, Zap, CalendarDays, MapPin, Ticket, Search,
-  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone, Heart, Filter, X,
+  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone, Heart, Filter, X, ArrowUpDown,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ const Index = () => {
   const [tierFilter, setTierFilter] = useState<string>("all"); // all | free | paid | vip | vvip
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [sort, setSort] = useState<string>("soonest"); // soonest | lowest_price | highest_tier
 
   useEffect(() => {
     const load = async () => {
@@ -53,7 +54,7 @@ const Index = () => {
     const q = query.trim().toLowerCase();
     const from = dateFrom ? new Date(dateFrom).getTime() : null;
     const to = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
-    return events.filter((e) => {
+    const base = events.filter((e) => {
       if (q && ![e.title, e.location, e.description].some((v) => v && String(v).toLowerCase().includes(q))) return false;
       if (locationFilter !== "all" && (e.location || "").trim() !== locationFilter) return false;
       if (tierFilter === "free" && e.is_paid) return false;
@@ -68,11 +69,41 @@ const Index = () => {
       }
       return true;
     });
-  }, [events, query, locationFilter, tierFilter, dateFrom, dateTo]);
 
-  const hasActiveFilters = locationFilter !== "all" || tierFilter !== "all" || !!dateFrom || !!dateTo || !!query.trim();
+    const minPrice = (e: any) => {
+      const prices: number[] = [];
+      if (e.general_enabled) prices.push(Number(e.general_price) || 0);
+      if (e.vip_enabled) prices.push(Number(e.vip_price) || 0);
+      if (e.vvip_enabled) prices.push(Number(e.vvip_price) || 0);
+      if (!e.is_paid || prices.length === 0) return 0;
+      return Math.min(...prices.filter((p) => p > 0));
+    };
+
+    const tierRank = (e: any) => {
+      if (e.vvip_enabled) return 3;
+      if (e.vip_enabled) return 2;
+      if (e.is_paid) return 1;
+      return 0;
+    };
+
+    const sorted = [...base];
+    if (sort === "soonest") {
+      sorted.sort((a, b) => {
+        const ta = a.start_at ? new Date(a.start_at).getTime() : Infinity;
+        const tb = b.start_at ? new Date(b.start_at).getTime() : Infinity;
+        return ta - tb;
+      });
+    } else if (sort === "lowest_price") {
+      sorted.sort((a, b) => minPrice(a) - minPrice(b));
+    } else if (sort === "highest_tier") {
+      sorted.sort((a, b) => tierRank(b) - tierRank(a));
+    }
+    return sorted;
+  }, [events, query, locationFilter, tierFilter, dateFrom, dateTo, sort]);
+
+  const hasActiveFilters = locationFilter !== "all" || tierFilter !== "all" || !!dateFrom || !!dateTo || !!query.trim() || sort !== "soonest";
   const clearFilters = () => {
-    setQuery(""); setLocationFilter("all"); setTierFilter("all"); setDateFrom(""); setDateTo("");
+    setQuery(""); setLocationFilter("all"); setTierFilter("all"); setDateFrom(""); setDateTo(""); setSort("soonest");
   };
 
   const startingPrice = (e: any) => {
@@ -195,7 +226,7 @@ const Index = () => {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="pl-9 h-10" />
@@ -223,6 +254,17 @@ const Index = () => {
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10" aria-label="From date" />
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10" aria-label="To date" />
             </div>
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="h-10">
+                <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                <SelectItem value="soonest">Soonest date</SelectItem>
+                <SelectItem value="lowest_price">Lowest price</SelectItem>
+                <SelectItem value="highest_tier">Highest tier</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
