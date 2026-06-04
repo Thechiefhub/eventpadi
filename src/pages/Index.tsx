@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowRight, Sparkles, Star, Zap, CalendarDays, MapPin, Ticket, Search,
-  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone, Heart, Filter, X,
+  Lightbulb, Handshake, Megaphone, Settings, ClipboardList, CalendarCheck, Globe, Wifi, Smartphone, Heart, Filter, X, ArrowUpDown,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
