@@ -130,6 +130,50 @@ export type Database = {
         }
         Relationships: []
       }
+      check_in_note_audits: {
+        Row: {
+          action: string
+          attendee_id: string
+          changed_by: string
+          changed_by_name: string | null
+          created_at: string
+          event_id: string
+          id: string
+          new_note: string | null
+          previous_note: string | null
+        }
+        Insert: {
+          action: string
+          attendee_id: string
+          changed_by: string
+          changed_by_name?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          new_note?: string | null
+          previous_note?: string | null
+        }
+        Update: {
+          action?: string
+          attendee_id?: string
+          changed_by?: string
+          changed_by_name?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          new_note?: string | null
+          previous_note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_in_note_audits_attendee_id_fkey"
+            columns: ["attendee_id"]
+            isOneToOne: false
+            referencedRelation: "attendees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_items: {
         Row: {
           category: string
