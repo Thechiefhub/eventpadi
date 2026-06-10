@@ -869,37 +869,24 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       {/* Badge grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.slice(0, search ? 50 : 6).map((a) => (
-          <Card
-            key={a.id}
-            className="border-border text-center cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
-            onClick={() => setSelectedAttendee(a)}
-          >
-            <CardContent className="p-4 flex flex-col items-center gap-2">
-              <QRCodeSVG value={a.ticket_id || a.id} size={100} level="M" includeMargin />
-              <p className="font-mono text-[11px] text-muted-foreground tracking-wider bg-muted px-2 py-0.5 rounded">
-                {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
-              </p>
-              <p className="font-display font-bold text-foreground text-sm">{a.name}</p>
-              <p className="text-xs text-muted-foreground">{a.email || a.phone || ""}</p>
-              {a.role && (
-                <Badge className="gradient-sunset text-primary-foreground text-xs border-transparent">
-                  {a.role}
-                </Badge>
-              )}
-              <Badge variant="secondary" className="text-xs">
-                Admit {a.admits || 1}
-              </Badge>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{eventName}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={(e) => { e.stopPropagation(); openEdit(a); }}
-              >
-                <Pencil className="h-3 w-3 mr-1" /> Edit
-              </Button>
-            </CardContent>
-          </Card>
+          <div key={a.id} className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedAttendee(a)}
+              className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/60 hover:scale-[1.02] transition-transform"
+              aria-label={`Preview badge for ${a.name}`}
+            >
+              <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} qrSize={110} width={260} />
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={(e) => { e.stopPropagation(); openEdit(a); }}
+            >
+              <Pencil className="h-3 w-3 mr-1" /> Edit
+            </Button>
+          </div>
         ))}
       </div>
 
