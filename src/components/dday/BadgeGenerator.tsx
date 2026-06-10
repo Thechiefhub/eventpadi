@@ -93,6 +93,25 @@ function BeautifulBadge({
 }) {
   const a = attendee;
   const ticket = a.ticket_id || a.id.slice(0, 12).toUpperCase();
+
+  /* Logo scales with badge width so it never crops and always looks proportional */
+  const logoSize = Math.max(28, Math.min(64, Math.round(width * 0.115)));
+  const logoPad = Math.max(2, Math.round(logoSize * 0.1));
+  const logoRadius = Math.round(logoSize * 0.22);
+  const initialFontSize = Math.round(logoSize * 0.48);
+
+  const logoContainerStyle: React.CSSProperties = {
+    height: logoSize,
+    width: logoSize,
+    borderRadius: logoRadius,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+    overflow: "hidden",
+  };
+
   return (
     <div
       ref={innerRef}
@@ -110,15 +129,44 @@ function BeautifulBadge({
       {/* Header: logo + event */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", gap: 10 }}>
         {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt="Organiser logo"
-            crossOrigin="anonymous"
-            style={{ height: 40, width: 40, borderRadius: 10, background: "#fff", objectFit: "contain", padding: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}
-          />
+          <div
+            style={{
+              ...logoContainerStyle,
+              background: "#ffffff",
+              padding: logoPad,
+            }}
+          >
+            <img
+              src={logoUrl}
+              alt="Organiser logo"
+              crossOrigin="anonymous"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
         ) : (
-          <div style={{ height: 40, width: 40, borderRadius: 10, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800 }}>
-            {(eventName || "E").charAt(0).toUpperCase()}
+          <div
+            style={{
+              ...logoContainerStyle,
+              background: "linear-gradient(135deg,#f59e0b 0%,#ec4899 50%,#4f46e5 100%)",
+              border: "2px solid rgba(255,255,255,0.45)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: initialFontSize,
+                fontWeight: 800,
+                color: "#fff",
+                textShadow: "0 1px 4px rgba(0,0,0,0.35)",
+                lineHeight: 1,
+              }}
+            >
+              {(eventName || "E").charAt(0).toUpperCase()}
+            </span>
           </div>
         )}
         <span style={{ fontSize: 10, opacity: 0.92, letterSpacing: 2, textTransform: "uppercase", textAlign: "right", lineHeight: 1.2, maxWidth: 200 }}>
