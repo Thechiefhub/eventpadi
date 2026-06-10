@@ -772,7 +772,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_invite_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          event_id: string
+          event_name: string
+          id: string
+          invited_email: string
+          role: string
+          status: string
+          token_expires_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
