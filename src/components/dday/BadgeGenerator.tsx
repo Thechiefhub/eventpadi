@@ -1059,7 +1059,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <div className="hidden">
         {selectedAttendee && (
           <div ref={singleBadgeRef}>
-            {badgeHTML(selectedAttendee, eventName)}
+            <BeautifulBadge attendee={selectedAttendee} eventName={eventName} logoUrl={logoUrl} />
           </div>
         )}
       </div>
@@ -1195,37 +1195,16 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
 
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
-        {attendees.map((a) => badgeHTML(a, eventName))}
+        {attendees.map((a) => (
+          <BeautifulBadge key={a.id} attendee={a} eventName={eventName} logoUrl={logoUrl} />
+        ))}
       </div>
 
       {/* Hidden: rendered React badges used by bulk PNG export */}
       <div ref={bulkRenderRef} style={{ position: "fixed", left: "-10000px", top: 0, pointerEvents: "none" }}>
         {attendees.map((a) => (
-          <div
-            key={`bulk-${a.id}`}
-            id={`bulk-badge-${a.id}`}
-            style={{
-              width: 320,
-              padding: 24,
-              background: "#ffffff",
-              border: "1px solid #e5e5e5",
-              borderRadius: 12,
-              textAlign: "center",
-              fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
-              marginBottom: 12,
-            }}
-          >
-            <QRCodeSVG value={a.ticket_id || a.id} size={140} level="M" includeMargin />
-            <p style={{ fontFamily: "monospace", fontSize: 11, color: "#666", letterSpacing: 2, margin: "8px 0" }}>
-              {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
-            </p>
-            <p style={{ fontSize: 18, fontWeight: 700, margin: "4px 0", color: "#111" }}>{a.name}</p>
-            <p style={{ fontSize: 12, color: "#666" }}>{a.email || a.phone || ""}</p>
-            {a.role && (
-              <span style={{ display: "inline-block", background: "#f97316", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6 }}>{a.role}</span>
-            )}
-            <span style={{ display: "inline-block", background: "#2563eb", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6, marginLeft: 4 }}>Admit {a.admits || 1}</span>
-            <p style={{ fontSize: 10, color: "#999", marginTop: 8, textTransform: "uppercase", letterSpacing: 1 }}>{eventName}</p>
+          <div key={`bulk-${a.id}`} id={`bulk-badge-${a.id}`} style={{ marginBottom: 12 }}>
+            <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} />
           </div>
         ))}
       </div>
