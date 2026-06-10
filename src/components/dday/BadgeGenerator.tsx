@@ -707,6 +707,28 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           )}
         </div>
         <div className="flex gap-2">
+          <input
+            ref={logoFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => logoFileRef.current?.click()}
+            disabled={uploadingLogo}
+            title={logoUrl ? "Replace organiser logo on every badge" : "Upload organiser logo (shown on every badge)"}
+          >
+            {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+            {logoUrl ? "Change Logo" : "Upload Logo"}
+          </Button>
+          {logoUrl && (
+            <Button variant="ghost" size="sm" onClick={handleLogoRemove} title="Remove logo" className="text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           {missingCount > 0 && onGenerateMissingIds && (
             <Button variant="outline" size="sm" onClick={onGenerateMissingIds}>
               <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
