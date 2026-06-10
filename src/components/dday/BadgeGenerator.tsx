@@ -912,25 +912,12 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           </DialogHeader>
           {selectedAttendee && (
             <div className="flex flex-col items-center gap-4">
-              <Card className="border-border w-full max-w-xs text-center" ref={badgeCardRef}>
-                <CardContent className="p-6 flex flex-col items-center gap-3">
-                  <QRCodeSVG value={selectedAttendee.ticket_id || selectedAttendee.id} size={140} level="M" includeMargin />
-                  <p className="font-mono text-xs text-muted-foreground tracking-widest bg-muted px-3 py-1 rounded">
-                    {selectedAttendee.ticket_id || selectedAttendee.id.slice(0, 12).toUpperCase()}
-                  </p>
-                   <p className="font-display font-bold text-foreground text-lg">{selectedAttendee.name}</p>
-                   <p className="text-sm text-muted-foreground">{selectedAttendee.email || selectedAttendee.phone || ""}</p>
-                   {selectedAttendee.role && (
-                     <Badge className="gradient-sunset text-primary-foreground text-sm border-transparent">
-                       {selectedAttendee.role}
-                     </Badge>
-                   )}
-                   <Badge variant="secondary" className="text-sm">
-                     Admit {selectedAttendee.admits || 1}
-                   </Badge>
-                   <p className="text-xs text-muted-foreground uppercase tracking-widest">{eventName}</p>
-                </CardContent>
-              </Card>
+              <BeautifulBadge
+                attendee={selectedAttendee}
+                eventName={eventName}
+                logoUrl={logoUrl}
+                innerRef={badgeCardRef}
+              />
               <div className="flex gap-2 w-full">
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedAttendee(null)}>
                   Close
