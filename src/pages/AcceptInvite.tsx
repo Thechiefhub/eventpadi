@@ -141,7 +141,7 @@ export default function AcceptInvite() {
             <CheckCircle className="h-12 w-12 text-[hsl(var(--earth-green))]" />
             <h2 className="text-lg font-display font-bold text-foreground">You're in!</h2>
             <p className="text-sm text-muted-foreground">
-              You've joined <strong>{invite?.events?.name || "the event"}</strong> as{" "}
+              You've joined <strong>{invite?.event_name || "the event"}</strong> as{" "}
               <Badge variant="outline">{invite?.role}</Badge>.
             </p>
             <Button onClick={() => navigate("/dashboard/dday")} className="gradient-sunset text-primary-foreground gap-2">
@@ -168,7 +168,7 @@ export default function AcceptInvite() {
             You've been invited to join
           </p>
           <h3 className="text-lg font-display font-bold text-foreground">
-            {invite?.events?.name || "an event"}
+            {invite?.event_name || "an event"}
           </h3>
           <div className="flex justify-center">
             <Badge className="gradient-sunset text-primary-foreground border-0 text-sm px-3 py-1">
