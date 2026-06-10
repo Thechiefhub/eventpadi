@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Eye, Filter } from "lucide-react";
+import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Mail, MessageCircle, Instagram, Pencil, Package, Settings2, Send, RefreshCw, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Eye, Filter, ImagePlus, Trash2 } from "lucide-react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
@@ -63,30 +63,109 @@ type ShareLog = {
 
 const BADGE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; }
+  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; }
-  .badge { border: 2px solid #e5e5e5; border-radius: 12px; padding: 20px; text-align: center; page-break-inside: avoid; }
-  .badge h3 { font-size: 18px; margin: 8px 0 2px; }
-  .badge p { font-size: 12px; color: #666; }
-  .badge .code { font-family: monospace; font-size: 10px; color: #888; letter-spacing: 2px; margin: 4px 0; }
-  .badge .role { display: inline-block; background: #f97316; color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 99px; margin-top: 6px; }
-  .badge .event { font-size: 10px; color: #999; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
-  .badge svg { margin: 0 auto; }
-  @media print { .grid { padding: 0; } .badge { border: 1px solid #ccc; } }
+  .badge { page-break-inside: avoid; }
+  .badge svg { margin: 0 auto; display: block; }
+  @media print { .grid { padding: 0; } body { background: #fff; } }
 `;
 
-function badgeHTML(a: Attendee, eventName: string, innerRef?: React.RefObject<HTMLDivElement>) {
+/**
+ * Beautiful, print-ready badge with a vibrant gradient, "CONFIRMED" headline,
+ * organiser logo at the top-left and a clean QR card. All styling is inline
+ * so the same markup renders identically in-app, in the print window and in
+ * the html-to-image PNG export.
+ */
+function BeautifulBadge({
+  attendee,
+  eventName,
+  logoUrl,
+  qrSize = 140,
+  width = 340,
+  innerRef,
+}: {
+  attendee: Attendee;
+  eventName: string;
+  logoUrl: string | null;
+  qrSize?: number;
+  width?: number;
+  innerRef?: React.RefObject<HTMLDivElement>;
+}) {
+  const a = attendee;
+  const ticket = a.ticket_id || a.id.slice(0, 12).toUpperCase();
   return (
-    <div key={a.id} className="badge" ref={innerRef}>
-      <QRCodeSVG value={a.ticket_id || a.id} size={90} level="M" includeMargin />
-      <p className="code" style={{ fontFamily: "monospace", fontSize: "10px", color: "#888", letterSpacing: "2px", margin: "4px 0" }}>
-        {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
-      </p>
-      <h3>{a.name}</h3>
-      <p>{a.email || a.phone || ""}</p>
-      {a.role && <span className="role">{a.role}</span>}
-      <span className="role" style={{ background: "#2563eb", marginLeft: "4px" }}>Admit {a.admits || 1}</span>
-      <p className="event">{eventName}</p>
+    <div
+      ref={innerRef}
+      className="badge"
+      style={{
+        width,
+        borderRadius: 18,
+        overflow: "hidden",
+        background: "linear-gradient(135deg,#4f46e5 0%,#ec4899 45%,#f59e0b 100%)",
+        fontFamily: "'Space Grotesk','Segoe UI',sans-serif",
+        color: "#ffffff",
+        boxShadow: "0 10px 30px -10px rgba(15,23,42,0.35)",
+      }}
+    >
+      {/* Header: logo + event */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", gap: 10 }}>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt="Organiser logo"
+            crossOrigin="anonymous"
+            style={{ height: 40, width: 40, borderRadius: 10, background: "#fff", objectFit: "contain", padding: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}
+          />
+        ) : (
+          <div style={{ height: 40, width: 40, borderRadius: 10, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800 }}>
+            {(eventName || "E").charAt(0).toUpperCase()}
+          </div>
+        )}
+        <span style={{ fontSize: 10, opacity: 0.92, letterSpacing: 2, textTransform: "uppercase", textAlign: "right", lineHeight: 1.2, maxWidth: 200 }}>
+          {eventName}
+        </span>
+      </div>
+
+      {/* CONFIRMED title */}
+      <div style={{ textAlign: "center", padding: "2px 12px 10px" }}>
+        <h2
+          style={{
+            fontSize: 30,
+            fontWeight: 900,
+            letterSpacing: 5,
+            margin: 0,
+            color: "#fff7ed",
+            textShadow: "0 2px 10px rgba(0,0,0,0.35), 0 0 1px rgba(255,255,255,0.6)",
+          }}
+        >
+          CONFIRMED
+        </h2>
+        <div style={{ width: 56, height: 3, background: "#fde68a", borderRadius: 99, margin: "6px auto 0" }} />
+      </div>
+
+      {/* QR card */}
+      <div style={{ background: "#ffffff", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "#0f172a", textAlign: "center" }}>
+        <QRCodeSVG value={ticket} size={qrSize} level="M" includeMargin />
+        <p style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", letterSpacing: 2, margin: "6px 0 8px" }}>
+          {ticket}
+        </p>
+        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "#0f172a" }}>{a.name}</p>
+        {(a.email || a.phone) && (
+          <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 8px", wordBreak: "break-word" }}>
+            {a.email || a.phone}
+          </p>
+        )}
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+          {a.role && (
+            <span style={{ display: "inline-block", background: "linear-gradient(135deg,#f97316,#ec4899)", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+              {a.role}
+            </span>
+          )}
+          <span style={{ display: "inline-block", background: "#0f172a", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+            Admit {a.admits || 1}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -103,6 +182,53 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   const [editing, setEditing] = useState<Attendee | null>(null);
   const [editForm, setEditForm] = useState({ name: "", role: "", admits: "1", email: "", phone: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Organiser logo (per-event, persisted on events.organizer_logo_url)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!eventId) { setLogoUrl(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("events").select("organizer_logo_url").eq("id", eventId).maybeSingle();
+      if (!cancelled) setLogoUrl((data as any)?.organizer_logo_url || null);
+    })();
+    return () => { cancelled = true; };
+  }, [eventId]);
+
+  const handleLogoUpload = useCallback(async (file: File) => {
+    if (!eventId) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be 2MB or smaller"); return; }
+    setUploadingLogo(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      const path = `org-logos/${eventId}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("event-flyers").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("event-flyers").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: dbErr } = await supabase.from("events").update({ organizer_logo_url: url }).eq("id", eventId);
+      if (dbErr) throw dbErr;
+      setLogoUrl(url);
+      toast.success("Logo updated — applied to all badges");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message || err}`);
+    } finally {
+      setUploadingLogo(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
+  }, [eventId]);
+
+  const handleLogoRemove = useCallback(async () => {
+    if (!eventId) return;
+    const { error } = await supabase.from("events").update({ organizer_logo_url: null }).eq("id", eventId);
+    if (error) { toast.error(`Failed: ${error.message}`); return; }
+    setLogoUrl(null);
+    toast.success("Logo removed");
+  }, [eventId]);
 
   // Share templates (persisted per event)
   const tplKey = `badge_share_templates_${eventId}`;
@@ -581,6 +707,28 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           )}
         </div>
         <div className="flex gap-2">
+          <input
+            ref={logoFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => logoFileRef.current?.click()}
+            disabled={uploadingLogo}
+            title={logoUrl ? "Replace organiser logo on every badge" : "Upload organiser logo (shown on every badge)"}
+          >
+            {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+            {logoUrl ? "Change Logo" : "Upload Logo"}
+          </Button>
+          {logoUrl && (
+            <Button variant="ghost" size="sm" onClick={handleLogoRemove} title="Remove logo" className="text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
           {missingCount > 0 && onGenerateMissingIds && (
             <Button variant="outline" size="sm" onClick={onGenerateMissingIds}>
               <Sparkles className="h-4 w-4 mr-1" /> Generate Missing IDs
@@ -721,37 +869,24 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       {/* Badge grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.slice(0, search ? 50 : 6).map((a) => (
-          <Card
-            key={a.id}
-            className="border-border text-center cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
-            onClick={() => setSelectedAttendee(a)}
-          >
-            <CardContent className="p-4 flex flex-col items-center gap-2">
-              <QRCodeSVG value={a.ticket_id || a.id} size={100} level="M" includeMargin />
-              <p className="font-mono text-[11px] text-muted-foreground tracking-wider bg-muted px-2 py-0.5 rounded">
-                {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
-              </p>
-              <p className="font-display font-bold text-foreground text-sm">{a.name}</p>
-              <p className="text-xs text-muted-foreground">{a.email || a.phone || ""}</p>
-              {a.role && (
-                <Badge className="gradient-sunset text-primary-foreground text-xs border-transparent">
-                  {a.role}
-                </Badge>
-              )}
-              <Badge variant="secondary" className="text-xs">
-                Admit {a.admits || 1}
-              </Badge>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{eventName}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={(e) => { e.stopPropagation(); openEdit(a); }}
-              >
-                <Pencil className="h-3 w-3 mr-1" /> Edit
-              </Button>
-            </CardContent>
-          </Card>
+          <div key={a.id} className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedAttendee(a)}
+              className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/60 hover:scale-[1.02] transition-transform"
+              aria-label={`Preview badge for ${a.name}`}
+            >
+              <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} qrSize={110} width={260} />
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={(e) => { e.stopPropagation(); openEdit(a); }}
+            >
+              <Pencil className="h-3 w-3 mr-1" /> Edit
+            </Button>
+          </div>
         ))}
       </div>
 
@@ -777,25 +912,12 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
           </DialogHeader>
           {selectedAttendee && (
             <div className="flex flex-col items-center gap-4">
-              <Card className="border-border w-full max-w-xs text-center" ref={badgeCardRef}>
-                <CardContent className="p-6 flex flex-col items-center gap-3">
-                  <QRCodeSVG value={selectedAttendee.ticket_id || selectedAttendee.id} size={140} level="M" includeMargin />
-                  <p className="font-mono text-xs text-muted-foreground tracking-widest bg-muted px-3 py-1 rounded">
-                    {selectedAttendee.ticket_id || selectedAttendee.id.slice(0, 12).toUpperCase()}
-                  </p>
-                   <p className="font-display font-bold text-foreground text-lg">{selectedAttendee.name}</p>
-                   <p className="text-sm text-muted-foreground">{selectedAttendee.email || selectedAttendee.phone || ""}</p>
-                   {selectedAttendee.role && (
-                     <Badge className="gradient-sunset text-primary-foreground text-sm border-transparent">
-                       {selectedAttendee.role}
-                     </Badge>
-                   )}
-                   <Badge variant="secondary" className="text-sm">
-                     Admit {selectedAttendee.admits || 1}
-                   </Badge>
-                   <p className="text-xs text-muted-foreground uppercase tracking-widest">{eventName}</p>
-                </CardContent>
-              </Card>
+              <BeautifulBadge
+                attendee={selectedAttendee}
+                eventName={eventName}
+                logoUrl={logoUrl}
+                innerRef={badgeCardRef}
+              />
               <div className="flex gap-2 w-full">
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedAttendee(null)}>
                   Close
@@ -937,7 +1059,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <div className="hidden">
         {selectedAttendee && (
           <div ref={singleBadgeRef}>
-            {badgeHTML(selectedAttendee, eventName)}
+            <BeautifulBadge attendee={selectedAttendee} eventName={eventName} logoUrl={logoUrl} />
           </div>
         )}
       </div>
@@ -1073,37 +1195,16 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
 
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
-        {attendees.map((a) => badgeHTML(a, eventName))}
+        {attendees.map((a) => (
+          <BeautifulBadge key={a.id} attendee={a} eventName={eventName} logoUrl={logoUrl} />
+        ))}
       </div>
 
       {/* Hidden: rendered React badges used by bulk PNG export */}
       <div ref={bulkRenderRef} style={{ position: "fixed", left: "-10000px", top: 0, pointerEvents: "none" }}>
         {attendees.map((a) => (
-          <div
-            key={`bulk-${a.id}`}
-            id={`bulk-badge-${a.id}`}
-            style={{
-              width: 320,
-              padding: 24,
-              background: "#ffffff",
-              border: "1px solid #e5e5e5",
-              borderRadius: 12,
-              textAlign: "center",
-              fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif",
-              marginBottom: 12,
-            }}
-          >
-            <QRCodeSVG value={a.ticket_id || a.id} size={140} level="M" includeMargin />
-            <p style={{ fontFamily: "monospace", fontSize: 11, color: "#666", letterSpacing: 2, margin: "8px 0" }}>
-              {a.ticket_id || a.id.slice(0, 12).toUpperCase()}
-            </p>
-            <p style={{ fontSize: 18, fontWeight: 700, margin: "4px 0", color: "#111" }}>{a.name}</p>
-            <p style={{ fontSize: 12, color: "#666" }}>{a.email || a.phone || ""}</p>
-            {a.role && (
-              <span style={{ display: "inline-block", background: "#f97316", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6 }}>{a.role}</span>
-            )}
-            <span style={{ display: "inline-block", background: "#2563eb", color: "#fff", fontSize: 11, padding: "2px 10px", borderRadius: 99, marginTop: 6, marginLeft: 4 }}>Admit {a.admits || 1}</span>
-            <p style={{ fontSize: 10, color: "#999", marginTop: 8, textTransform: "uppercase", letterSpacing: 1 }}>{eventName}</p>
+          <div key={`bulk-${a.id}`} id={`bulk-badge-${a.id}`} style={{ marginBottom: 12 }}>
+            <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} />
           </div>
         ))}
       </div>

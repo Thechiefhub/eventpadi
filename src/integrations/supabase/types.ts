@@ -465,6 +465,7 @@ export type Database = {
           event_type: string | null
           id: string
           name: string
+          organizer_logo_url: string | null
           progress: number | null
           tagline: string | null
           theme_statement: string | null
@@ -479,6 +480,7 @@ export type Database = {
           event_type?: string | null
           id?: string
           name: string
+          organizer_logo_url?: string | null
           progress?: number | null
           tagline?: string | null
           theme_statement?: string | null
@@ -493,6 +495,7 @@ export type Database = {
           event_type?: string | null
           id?: string
           name?: string
+          organizer_logo_url?: string | null
           progress?: number | null
           tagline?: string | null
           theme_statement?: string | null
