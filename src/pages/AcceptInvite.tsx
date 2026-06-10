@@ -26,7 +26,7 @@ interface InviteData {
   role: string;
   status: string;
   token_expires_at: string;
-  events: { name: string } | null;
+  event_name: string | null;
 }
 
 export default function AcceptInvite() {
@@ -39,15 +39,13 @@ export default function AcceptInvite() {
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
 
-  // Fetch the invite by token
+  // Fetch the invite by token via secure RPC (replaces direct table query)
   useEffect(() => {
     if (!token) { setError("Invalid invitation link"); setLoading(false); return; }
 
     const fetchInvite = async () => {
       const { data, error: fetchError } = await supabase
-        .from("event_team_members")
-        .select("id, event_id, invited_email, role, status, token_expires_at, events(name)")
-        .eq("invitation_token", token)
+        .rpc("get_invite_by_token", { p_token: token })
         .single();
 
       if (fetchError || !data) {
