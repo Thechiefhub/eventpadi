@@ -779,6 +779,53 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
 
   return (
     <div className="space-y-4">
+      {/* Per-event organiser logo — applies to every badge (already generated + future) */}
+      <Card className="border-dashed">
+        <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div
+            className="h-16 w-16 rounded-xl bg-gradient-to-br from-indigo-500 via-pink-500 to-amber-400 flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0"
+            title={logoUrl ? "Current organiser logo" : "No logo uploaded"}
+          >
+            {logoUrl ? (
+              <img src={logoUrl} alt="Organiser logo" className="h-full w-full object-contain bg-white" />
+            ) : (
+              <span className="text-white font-black text-2xl">
+                {(eventName || "E").charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Organiser logo</p>
+            <p className="text-xs text-muted-foreground">
+              Saved per event. {logoUrl ? "Applied automatically to every badge — existing and future." : "Upload once — it will appear on every badge for this event."}
+              {" "}PNG or JPG, up to 2MB. Square works best.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logoFileRef.current?.click()}
+              disabled={uploadingLogo}
+            >
+              {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+              {logoUrl ? "Replace logo" : "Upload logo"}
+            </Button>
+            {logoUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogoRemove}
+                className="text-destructive"
+                title="Remove logo from every badge"
+              >
+                <Trash2 className="h-4 w-4 mr-1" /> Remove
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Top bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
