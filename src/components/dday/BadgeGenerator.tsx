@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
+import { buildQrPayload } from "@/lib/ticket";
 
 interface Props {
   eventId: string;
@@ -79,6 +80,7 @@ const BADGE_STYLES = `
 function BeautifulBadge({
   attendee,
   eventName,
+  eventId,
   logoUrl,
   qrSize = 140,
   width = 340,
@@ -86,6 +88,7 @@ function BeautifulBadge({
 }: {
   attendee: Attendee;
   eventName: string;
+  eventId: string;
   logoUrl: string | null;
   qrSize?: number;
   width?: number;
@@ -93,6 +96,15 @@ function BeautifulBadge({
 }) {
   const a = attendee;
   const ticket = a.ticket_id || a.id.slice(0, 12).toUpperCase();
+
+  /* Unique QR payload — combines ticket ref + event id + attendee id so every
+   * badge (General/VIP/VVIP) scans as a distinct, tamper-evident code even if
+   * two attendees ever shared a ticket short-code. */
+  const qrValue = buildQrPayload({
+    ticketRef: ticket,
+    eventId,
+    registrationId: a.id,
+  });
 
   /* Logo scales with badge width so it never crops and always looks proportional */
   const logoSize = Math.max(28, Math.min(64, Math.round(width * 0.115)));
@@ -111,6 +123,19 @@ function BeautifulBadge({
     boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
     overflow: "hidden",
   };
+
+  /* Centred logo overlay inside the QR. Uses error-correction level "H" so up
+   * to ~30% of the QR can be obscured without breaking the scan. Logo size is
+   * ~18% of the QR — a safe, standard ratio for embedded QR logos. */
+  const qrLogoSize = Math.round(qrSize * 0.18);
+  const qrImageSettings = logoUrl
+    ? {
+        src: logoUrl,
+        height: qrLogoSize,
+        width: qrLogoSize,
+        excavate: true,
+      }
+    : undefined;
 
   return (
     <div
@@ -193,7 +218,15 @@ function BeautifulBadge({
 
       {/* QR card */}
       <div style={{ background: "#ffffff", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "#0f172a", textAlign: "center" }}>
-        <QRCodeSVG value={ticket} size={qrSize} level="M" includeMargin />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+          <QRCodeSVG
+            value={qrValue}
+            size={qrSize}
+            level="H"
+            includeMargin
+            imageSettings={qrImageSettings}
+          />
+        </div>
         <p style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", letterSpacing: 2, margin: "6px 0 8px" }}>
           {ticket}
         </p>
