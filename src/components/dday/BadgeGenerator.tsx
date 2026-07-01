@@ -957,7 +957,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
               className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/60 hover:scale-[1.02] transition-transform"
               aria-label={`Preview badge for ${a.name}`}
             >
-              <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} qrSize={110} width={260} />
+              <BeautifulBadge attendee={a} eventName={eventName} eventId={eventId} logoUrl={logoUrl} qrSize={110} width={260} />
             </button>
             <Button
               variant="ghost"
@@ -1140,7 +1140,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <div className="hidden">
         {selectedAttendee && (
           <div ref={singleBadgeRef}>
-            <BeautifulBadge attendee={selectedAttendee} eventName={eventName} logoUrl={logoUrl} />
+            <BeautifulBadge attendee={selectedAttendee} eventName={eventName} eventId={eventId} logoUrl={logoUrl} />
           </div>
         )}
       </div>
@@ -1285,7 +1285,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <div ref={bulkRenderRef} style={{ position: "fixed", left: "-10000px", top: 0, pointerEvents: "none" }}>
         {attendees.map((a) => (
           <div key={`bulk-${a.id}`} id={`bulk-badge-${a.id}`} style={{ marginBottom: 12 }}>
-            <BeautifulBadge attendee={a} eventName={eventName} logoUrl={logoUrl} />
+            <BeautifulBadge attendee={a} eventName={eventName} eventId={eventId} logoUrl={logoUrl} />
           </div>
         ))}
       </div>
