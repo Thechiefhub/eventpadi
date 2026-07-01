@@ -996,6 +996,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
               <BeautifulBadge
                 attendee={selectedAttendee}
                 eventName={eventName}
+                eventId={eventId}
                 logoUrl={logoUrl}
                 innerRef={badgeCardRef}
               />
@@ -1277,7 +1278,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       {/* Hidden: all badges for bulk print */}
       <div ref={printRef} className="hidden">
         {attendees.map((a) => (
-          <BeautifulBadge key={a.id} attendee={a} eventName={eventName} logoUrl={logoUrl} />
+          <BeautifulBadge key={a.id} attendee={a} eventName={eventName} eventId={eventId} logoUrl={logoUrl} />
         ))}
       </div>
 
