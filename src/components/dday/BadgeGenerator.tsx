@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
@@ -267,6 +268,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   // Organiser logo (per-event, persisted on events.organizer_logo_url)
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoProgress, setLogoProgress] = useState(0);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -281,24 +283,50 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
 
   const handleLogoUpload = useCallback(async (file: File) => {
     if (!eventId) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file"); return; }
-    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be 2MB or smaller"); return; }
+    const ALLOWED = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+    if (!ALLOWED.includes(file.type)) {
+      toast.error(`Unsupported file type${file.type ? ` (${file.type})` : ""}. Use PNG, JPG, WebP, or SVG.`);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+      return;
+    }
+    const MAX = 2 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error(`Logo is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum is 2MB — try compressing or resizing to ~512px.`);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+      return;
+    }
     setUploadingLogo(true);
+    setLogoProgress(8);
+    // Indeterminate-style progress ticker (Supabase JS does not expose real upload progress)
+    const ticker = setInterval(() => {
+      setLogoProgress((p) => (p < 85 ? p + Math.max(1, Math.round((90 - p) * 0.08)) : p));
+    }, 180);
     try {
       const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
       const path = `org-logos/${eventId}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("event-flyers").upload(path, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
+      setLogoProgress(92);
       const { data: pub } = supabase.storage.from("event-flyers").getPublicUrl(path);
       const url = pub.publicUrl;
       const { error: dbErr } = await supabase.from("events").update({ organizer_logo_url: url }).eq("id", eventId);
       if (dbErr) throw dbErr;
+      setLogoProgress(100);
       setLogoUrl(url);
       toast.success("Logo updated — applied to all badges");
     } catch (err: any) {
-      toast.error(`Upload failed: ${err.message || err}`);
+      const msg = err?.message || String(err);
+      if (/exceeded|too large|payload/i.test(msg)) {
+        toast.error("Upload rejected by server — file too large. Please use an image under 2MB.");
+      } else if (/network|fetch/i.test(msg)) {
+        toast.error("Network error while uploading logo. Check your connection and try again.");
+      } else {
+        toast.error(`Upload failed: ${msg}`);
+      }
     } finally {
+      clearInterval(ticker);
       setUploadingLogo(false);
+      setTimeout(() => setLogoProgress(0), 600);
       if (logoFileRef.current) logoFileRef.current.value = "";
     }
   }, [eventId]);
@@ -800,6 +828,12 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
               Saved per event. {logoUrl ? "Applied automatically to every badge — existing and future." : "Upload once — it will appear on every badge for this event."}
               {" "}PNG or JPG, up to 2MB. Square works best.
             </p>
+            {uploadingLogo && (
+              <div className="mt-2 space-y-1">
+                <Progress value={logoProgress} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground">Uploading… {logoProgress}%</p>
+              </div>
+            )}
           </div>
           <div className="flex gap-2 shrink-0">
             <Button
@@ -809,7 +843,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
               disabled={uploadingLogo}
             >
               {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ImagePlus className="h-4 w-4 mr-1" />}
-              {logoUrl ? "Replace logo" : "Upload logo"}
+              {uploadingLogo ? "Uploading…" : logoUrl ? "Replace logo" : "Upload logo"}
             </Button>
             {logoUrl && (
               <Button
@@ -817,6 +851,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
                 size="sm"
                 onClick={handleLogoRemove}
                 className="text-destructive"
+                disabled={uploadingLogo}
                 title="Remove logo from every badge"
               >
                 <Trash2 className="h-4 w-4 mr-1" /> Remove
