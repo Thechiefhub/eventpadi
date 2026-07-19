@@ -302,13 +302,20 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       setLogoProgress((p) => (p < 85 ? p + Math.max(1, Math.round((90 - p) * 0.08)) : p));
     }, 180);
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      // Normalize raster logos to a square 512×512 PNG so every badge size
+      // renders identically without clipping, tainted canvas, or oversized files.
+      // SVG uploads pass through — they scale cleanly on their own.
+      const { blob, ext, contentType } = await normalizeLogo(file);
+      setLogoProgress(45);
       const path = `org-logos/${eventId}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("event-flyers").upload(path, file, { upsert: true, contentType: file.type });
+      const { error: upErr } = await supabase.storage
+        .from("event-flyers")
+        .upload(path, blob, { upsert: true, contentType, cacheControl: "3600" });
       if (upErr) throw upErr;
       setLogoProgress(92);
       const { data: pub } = supabase.storage.from("event-flyers").getPublicUrl(path);
-      const url = pub.publicUrl;
+      // Cache-bust so the freshly uploaded logo replaces any cached copy immediately.
+      const url = `${pub.publicUrl}?v=${Date.now()}`;
       const { error: dbErr } = await supabase.from("events").update({ organizer_logo_url: url }).eq("id", eventId);
       if (dbErr) throw dbErr;
       setLogoProgress(100);
@@ -318,8 +325,12 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       const msg = err?.message || String(err);
       if (/exceeded|too large|payload/i.test(msg)) {
         toast.error("Upload rejected by server — file too large. Please use an image under 2MB.");
-      } else if (/network|fetch/i.test(msg)) {
-        toast.error("Network error while uploading logo. Check your connection and try again.");
+      } else if (/network|fetch|Failed to fetch/i.test(msg)) {
+        toast.error("Network error while uploading logo. Check your connection and try again.", {
+          action: { label: "Retry", onClick: () => handleLogoUpload(file) },
+        });
+      } else if (/dimensions|corrupt|encode|Canvas|decode/i.test(msg)) {
+        toast.error(`Couldn't process the image: ${msg}. Try a different file (PNG or JPG works best).`);
       } else {
         toast.error(`Upload failed: ${msg}`);
       }
