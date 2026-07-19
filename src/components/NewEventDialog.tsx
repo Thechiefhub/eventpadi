@@ -242,7 +242,7 @@ export default function NewEventDialog({ onCreated, children }: NewEventDialogPr
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Create New Event</DialogTitle>
         </DialogHeader>
