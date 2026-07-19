@@ -88,11 +88,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: urlData } = supabase.storage
+    // Bucket is private — issue a long-lived signed URL (1 year)
+    const { data: signed, error: signedErr } = await supabase.storage
       .from("certificates")
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 60 * 60 * 24 * 365);
 
-    const certificateUrl = urlData.publicUrl;
+    if (signedErr || !signed?.signedUrl) {
+      console.error("Signed URL error:", signedErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to sign certificate URL" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const certificateUrl = signed.signedUrl;
 
     // Update attendee record
     await supabase
