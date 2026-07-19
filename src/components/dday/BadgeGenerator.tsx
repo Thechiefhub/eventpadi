@@ -50,6 +50,60 @@ function applyVars(tpl: string, ctx: { name: string; event: string; ticket: stri
     .replace(/\{\{role\}\}/g, ctx.role);
 }
 
+/**
+ * Normalize an uploaded logo to a 512×512 white-background PNG so every badge
+ * size — including the tiny excavation inside the QR — renders the same crisp
+ * image without clipping, tainted canvas, or oversized payloads. SVGs pass
+ * through untouched because they scale losslessly on their own.
+ */
+async function normalizeLogo(file: File): Promise<{ blob: Blob; ext: string; contentType: string }> {
+  if (file.type === "image/svg+xml") {
+    return { blob: file, ext: "svg", contentType: "image/svg+xml" };
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const SIZE = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas not supported in this browser");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, SIZE, SIZE);
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!iw || !ih) throw new Error("Invalid image dimensions");
+        const scale = Math.min(SIZE / iw, SIZE / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, (SIZE - dw) / 2, (SIZE - dh) / 2, dw, dh);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            if (!blob) return reject(new Error("Failed to encode logo"));
+            resolve({ blob, ext: "png", contentType: "image/png" });
+          },
+          "image/png",
+          0.95,
+        );
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not decode image — file may be corrupt or unsupported"));
+    };
+    img.src = url;
+  });
+}
+
 type ShareLog = {
   id: string;
   attendee_id: string;
