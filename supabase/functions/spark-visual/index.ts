@@ -159,9 +159,12 @@ async function generateAndStore(
 
   if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
-  const { data: urlData } = supabase.storage.from("generated-visuals").getPublicUrl(filePath);
+  const { data: signed, error: signedErr } = await supabase.storage
+    .from("generated-visuals")
+    .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+  if (signedErr || !signed?.signedUrl) throw new Error(`Sign URL failed: ${signedErr?.message || "unknown"}`);
 
-  return { url: urlData.publicUrl, path: filePath };
+  return { url: signed.signedUrl, path: filePath };
 }
 
 async function editAndStore(
@@ -216,7 +219,10 @@ async function editAndStore(
 
   if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
-  const { data: urlData } = supabase.storage.from("generated-visuals").getPublicUrl(filePath);
+  const { data: signed, error: signedErr } = await supabase.storage
+    .from("generated-visuals")
+    .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+  if (signedErr || !signed?.signedUrl) throw new Error(`Sign URL failed: ${signedErr?.message || "unknown"}`);
 
-  return { url: urlData.publicUrl, path: filePath };
+  return { url: signed.signedUrl, path: filePath };
 }
