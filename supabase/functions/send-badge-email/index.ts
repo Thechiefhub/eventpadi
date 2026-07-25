@@ -52,6 +52,24 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
+  // Authorization: caller must be event owner OR accepted team member
+  const { data: eventRow } = await admin.from("events").select("user_id").eq("id", eventId).maybeSingle();
+  let allowed = eventRow?.user_id === user.id;
+  if (!allowed) {
+    const { data: tm } = await admin.from("event_team_members")
+      .select("id").eq("event_id", eventId).eq("user_id", user.id).eq("status", "accepted").maybeSingle();
+    allowed = !!tm;
+  }
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Validate the attendee actually belongs to this event
+  const { data: attRow } = await admin.from("attendees").select("id,event_id,email").eq("id", attendeeId).maybeSingle();
+  if (!attRow || attRow.event_id !== eventId) {
+    return new Response(JSON.stringify({ error: "Attendee does not belong to this event" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   const finalSubject = (subject && String(subject).trim()) || `Your badge for ${eventName}`;
   const finalMessage = (message && String(message).trim()) || `Hi {{name}},\n\nHere is your check-in badge for {{event}}.\nTicket ID: {{ticket}}\nAdmits: {{admits}}\n\nPresent the QR code at the entrance. See you there!`;
 
