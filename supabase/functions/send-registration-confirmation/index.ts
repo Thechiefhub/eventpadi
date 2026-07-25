@@ -22,9 +22,40 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json();
-    const { registrationId, name, email, phone, ticketTier, admits, ticketRef, eventTitle, eventDate, location, registrationUrl, eventId } = body;
-    if (!registrationId || !name || !ticketRef || !eventTitle) {
-      return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { registrationId, registrationUrl } = body;
+    if (!registrationId) {
+      return new Response(JSON.stringify({ error: "Missing registrationId" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Derive every user-visible field from the database — never trust caller input,
+    // otherwise this endpoint becomes an open email relay.
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const { data: reg, error: regErr } = await admin
+      .from("event_registrations")
+      .select("id,event_id,name,email,phone,ticket_tier,admits,ticket_reference")
+      .eq("id", registrationId)
+      .maybeSingle();
+    if (regErr || !reg) {
+      return new Response(JSON.stringify({ error: "Registration not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: ev } = await admin
+      .from("events")
+      .select("name,event_date,city,country")
+      .eq("id", reg.event_id)
+      .maybeSingle();
+
+    const name = reg.name;
+    const email = reg.email;
+    const phone = reg.phone;
+    const ticketTier = reg.ticket_tier;
+    const admits = reg.admits;
+    const ticketRef = reg.ticket_reference;
+    const eventTitle = ev?.name || "Event";
+    const eventDate = ev?.event_date || null;
+    const location = [ev?.city, ev?.country].filter(Boolean).join(", ") || null;
+    const eventId = reg.event_id;
+    if (!ticketRef) {
+      return new Response(JSON.stringify({ error: "Registration is missing a ticket reference" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const tierLabel = String(ticketTier || "general").toUpperCase();
@@ -71,7 +102,6 @@ Deno.serve(async (req) => {
     let emailError: string | null = null;
     if (email) {
       try {
-        const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
         const { data, error } = await admin.functions.invoke("send-transactional-email", {
           body: { to: email, subject, html, text },
         });

@@ -14,6 +14,13 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    // __AUTH_GUARD__ require authenticated caller
+    const _authHeader = req.headers.get("authorization");
+    if (!_authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { createClient: _cc } = await import("npm:@supabase/supabase-js@2");
+    const _uc = _cc(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: _authHeader } } });
+    const { data: { user: _u } } = await _uc.auth.getUser();
+    if (!_u) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const { mode = "description", title = "", theme = "", audience = "", location = "", tone = "vibrant, professional, African-rooted" } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");

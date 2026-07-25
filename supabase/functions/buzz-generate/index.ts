@@ -21,6 +21,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // __AUTH_GUARD__ require authenticated caller
+    const _authHeader = req.headers.get("authorization");
+    if (!_authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { createClient: _cc } = await import("npm:@supabase/supabase-js@2");
+    const _uc = _cc(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: _authHeader } } });
+    const { data: { user: _u } } = await _uc.auth.getUser();
+    if (!_u) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const body = await req.json();
     const { mode = "caption" } = body;
 

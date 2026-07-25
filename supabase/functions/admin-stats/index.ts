@@ -37,6 +37,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Enforce admin allowlist server-side
+    const ADMIN_EMAILS = ["chieftolulope@gmail.com"];
+    if (!user.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get all profiles with event counts
     const { data: profiles, error: profError } = await supabase
       .from("profiles")

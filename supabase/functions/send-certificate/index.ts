@@ -19,6 +19,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -28,18 +29,13 @@ Deno.serve(async (req) => {
   try {
     const {
       attendeeId,
-      attendeeName,
-      attendeeEmail,
-      eventName,
-      eventDate,
-      eventLocation,
       certificateId,
       customTemplateUrl,
       namePosition,
       certMode,
     } = await req.json();
 
-    if (!attendeeId || !attendeeName || !eventName || !certificateId) {
+    if (!attendeeId || !certificateId) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -47,6 +43,54 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Fetch attendee + event from DB — never trust client-supplied names/emails,
+    // otherwise this endpoint becomes an open email/spoofing relay.
+    const { data: attendee, error: attErr } = await supabase
+      .from("attendees")
+      .select("id,event_id,name,email,checked_in")
+      .eq("id", attendeeId)
+      .maybeSingle();
+    if (attErr || !attendee) {
+      return new Response(JSON.stringify({ error: "Attendee not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: eventRow } = await supabase
+      .from("events")
+      .select("id,user_id,name,event_date,city,country")
+      .eq("id", attendee.event_id)
+      .maybeSingle();
+    if (!eventRow) {
+      return new Response(JSON.stringify({ error: "Event not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Authorization: either the caller owns/staffs the event, or the attendee
+    // has already been checked in (self-serve path used by CertificateLookup).
+    let allowed = false;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        if (eventRow.user_id === user.id) allowed = true;
+        if (!allowed) {
+          const { data: tm } = await supabase
+            .from("event_team_members")
+            .select("id").eq("event_id", eventRow.id).eq("user_id", user.id).eq("status", "accepted").maybeSingle();
+          allowed = !!tm;
+        }
+      }
+    }
+    if (!allowed && attendee.checked_in) allowed = true;
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Not authorized to issue this certificate" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Use DB values only — never client-supplied names/emails
+    const attendeeName = attendee.name;
+    const attendeeEmail = attendee.email;
+    const eventName = eventRow.name;
+    const eventDate = eventRow.event_date || "";
+    const eventLocation = [eventRow.city, eventRow.country].filter(Boolean).join(", ");
 
     let pdfBytes: Uint8Array;
 
