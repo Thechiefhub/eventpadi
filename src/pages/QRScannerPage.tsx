@@ -179,7 +179,7 @@ export default function QRScannerPage() {
     setScanning(false);
   };
 
-  useEffect(() => () => stopScanner(), []);
+  useEffect(() => { return () => { void stopScanner(); }; }, []);
 
   const totalCi = useMemo(() => Object.values(counts).reduce((s, v) => s + v.checkedIn, 0), [counts]);
   const totalReg = useMemo(() => Object.values(counts).reduce((s, v) => s + v.total, 0), [counts]);
