@@ -87,6 +87,7 @@ export default function Auth() {
   };
 
   const handleGoogleLogin = async () => {
+    setPendingConfirmEmail(null);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin + "/dashboard",
@@ -104,6 +105,56 @@ export default function Auth() {
           <ArrowLeft className="h-4 w-4" /> Back to home
         </Link>
 
+        {pendingConfirmEmail ? (
+          <Card className="border-border">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl gradient-sunset">
+                <Mail className="h-7 w-7 text-primary-foreground" />
+              </div>
+              <CardTitle className="font-display text-2xl">Confirm your email</CardTitle>
+              <CardDescription>
+                We sent a confirmation link to <span className="font-medium text-foreground">{pendingConfirmEmail}</span>.
+                Click it to activate your account before signing in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground text-center">
+                The email comes from no-reply@mail.lovable-app.email. If you don't see it within a minute,
+                check your Promotions or Spam folder and mark it as “Not spam” so future mails land in your inbox.
+              </p>
+              <Button
+                className="w-full"
+                variant="outline"
+                disabled={resending}
+                onClick={async () => {
+                  setResending(true);
+                  try {
+                    const { error } = await supabase.auth.resend({
+                      type: "signup",
+                      email: pendingConfirmEmail,
+                      options: { emailRedirectTo: window.location.origin },
+                    });
+                    if (error) throw error;
+                    toast.success("Confirmation email resent");
+                  } catch (err: any) {
+                    toast.error(err.message || "Could not resend email");
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+              >
+                {resending ? "Resending…" : "Resend confirmation email"}
+              </Button>
+              <Button
+                className="w-full"
+                variant="ghost"
+                onClick={() => { setPendingConfirmEmail(null); setIsLogin(true); setPassword(""); }}
+              >
+                Back to sign in
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
         <Card className="border-border">
           <CardHeader className="text-center">
             <CardTitle className="font-display text-2xl">
