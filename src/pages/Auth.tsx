@@ -56,8 +56,14 @@ export default function Auth() {
         if (data.session) {
           toast.success("Account created!");
         } else {
-          setPendingConfirmEmail(email);
-          toast.success("Confirmation email sent — verify to activate your account");
+          // Auto-confirm is on: sign the new user straight in.
+          const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInError) {
+            setPendingConfirmEmail(email);
+            toast.success("Confirmation email sent — verify to activate your account");
+          } else {
+            toast.success("Account created!");
+          }
         }
       }
     } catch (error: any) {
