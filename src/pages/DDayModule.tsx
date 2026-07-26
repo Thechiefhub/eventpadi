@@ -127,29 +127,28 @@ export default function DDayModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid grid-cols-7 w-full">
-          <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
-            <Users className="h-4 w-4 mr-1 hidden sm:inline" /> Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="checkin" className="text-xs sm:text-sm">
-            <UserCheck className="h-4 w-4 mr-1 hidden sm:inline" /> Check-In
-          </TabsTrigger>
-          <TabsTrigger value="attendees" className="text-xs sm:text-sm">
-            Attendees
-          </TabsTrigger>
-          <TabsTrigger value="badges" className="text-xs sm:text-sm">
-            <QrCode className="h-4 w-4 mr-1 hidden sm:inline" /> Badges
-          </TabsTrigger>
-          <TabsTrigger value="certificates" className="text-xs sm:text-sm">
-            <Award className="h-4 w-4 mr-1 hidden sm:inline" /> Certs
-          </TabsTrigger>
-          <TabsTrigger value="announce" className="text-xs sm:text-sm">
-            <Megaphone className="h-4 w-4 mr-1 hidden sm:inline" /> Announce
-          </TabsTrigger>
-          <TabsTrigger value="team" className="text-xs sm:text-sm">
-            <Shield className="h-4 w-4 mr-1 hidden sm:inline" /> Team
-          </TabsTrigger>
-        </TabsList>
+        <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="flex w-full justify-start gap-2 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden h-auto p-1.5 rounded-2xl sm:grid sm:grid-cols-7 sm:gap-1">
+            {[
+              { v: "dashboard", label: "Dashboard", Icon: Users },
+              { v: "checkin", label: "Check-In", Icon: UserCheck },
+              { v: "attendees", label: "Attendees", Icon: Users },
+              { v: "badges", label: "Badges", Icon: QrCode },
+              { v: "certificates", label: "Certs", Icon: Award },
+              { v: "announce", label: "Announce", Icon: Megaphone },
+              { v: "team", label: "Team", Icon: Shield },
+            ].map(({ v, label, Icon }) => (
+              <TabsTrigger
+                key={v}
+                value={v}
+                className="shrink-0 snap-start rounded-xl px-4 py-2 text-xs sm:text-sm font-medium transition-all data-[state=active]:gradient-sunset data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg sm:shrink sm:px-2"
+              >
+                <Icon className="h-4 w-4 mr-1.5" /> {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
+        </div>
 
         <TabsContent value="dashboard" className="mt-4">
           <DDayDashboard attendees={attendees} isAdmin={isAdmin} onCheckIn={checkIn} onUndoCheckIn={undoCheckIn} />

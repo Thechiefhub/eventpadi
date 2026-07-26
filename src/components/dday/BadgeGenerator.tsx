@@ -4,6 +4,7 @@ import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Ma
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -307,6 +308,7 @@ function BeautifulBadge({
 }
 
 export default function BadgeGenerator({ eventId, attendees, eventName, onGenerateMissingIds }: Props) {
+  const isMobile = useIsMobile();
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
   const badgeCardRef = useRef<HTMLDivElement>(null);
@@ -1095,16 +1097,16 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       </div>
 
       {/* Badge grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {filtered.slice(0, search ? 50 : 6).map((a) => (
-          <div key={a.id} className="flex flex-col items-center gap-2">
+          <div key={a.id} className="flex flex-col items-center gap-2 min-w-0">
             <button
               type="button"
               onClick={() => setSelectedAttendee(a)}
-              className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/60 hover:scale-[1.02] transition-transform"
+              className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/60 hover:scale-[1.02] transition-transform max-w-full [&>*]:max-w-full"
               aria-label={`Preview badge for ${a.name}`}
             >
-              <BeautifulBadge attendee={a} eventName={eventName} eventId={eventId} logoUrl={logoUrl} qrSize={110} width={260} />
+              <BeautifulBadge attendee={a} eventName={eventName} eventId={eventId} logoUrl={logoUrl} qrSize={isMobile ? 84 : 110} width={isMobile ? 170 : 260} />
             </button>
             <Button
               variant="ghost"
