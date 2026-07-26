@@ -4,6 +4,7 @@ import { Printer, Sparkles, Search, X, Download, Loader2, Link2, Copy, Check, Ma
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
