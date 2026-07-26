@@ -39,14 +39,16 @@ export default function AcceptInvite() {
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
 
-  // Fetch the invite by token via secure RPC (replaces direct table query)
+  // Fetch the invite by token — RLS restricts rows to the invited (verified) email
   useEffect(() => {
     if (!token) { setError("Invalid invitation link"); setLoading(false); return; }
 
     const fetchInvite = async () => {
       const { data, error: fetchError } = await supabase
-        .rpc("get_invite_by_token", { p_token: token })
-        .single();
+        .from("event_team_members")
+        .select("id, event_id, invited_email, role, status, token_expires_at, events(name)")
+        .eq("invitation_token", token)
+        .maybeSingle();
 
       if (fetchError || !data) {
         setError("Invitation not found or has been revoked.");
@@ -54,7 +56,15 @@ export default function AcceptInvite() {
         return;
       }
 
-      const inviteData = data as unknown as InviteData;
+      const inviteData: InviteData = {
+        id: data.id,
+        event_id: data.event_id,
+        invited_email: data.invited_email,
+        role: data.role,
+        status: data.status,
+        token_expires_at: data.token_expires_at,
+        event_name: (data as any).events?.name ?? null,
+      };
 
       if (inviteData.status === "accepted") {
         setAccepted(true);
@@ -73,16 +83,18 @@ export default function AcceptInvite() {
       setLoading(false);
     };
 
+    if (authLoading) return;
+    if (!user) { setLoading(false); return; }
     fetchInvite();
-  }, [token]);
+  }, [token, user, authLoading]);
 
   // If not logged in, redirect to auth with return URL
   useEffect(() => {
-    if (!authLoading && !user && !loading && invite && !error) {
+    if (!authLoading && !user) {
       const returnTo = `/invite/${token}`;
       navigate(`/auth?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
     }
-  }, [authLoading, user, loading, invite, error, token, navigate]);
+  }, [authLoading, user, token, navigate]);
 
   const handleAccept = async () => {
     if (!user || !invite) return;
