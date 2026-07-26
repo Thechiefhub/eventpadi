@@ -238,6 +238,7 @@ export default function Auth() {
             </p>
           </CardContent>
         </Card>
+        )}
 
         {showForgot && (
           <Card className="border-border mt-4">
