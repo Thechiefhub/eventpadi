@@ -83,16 +83,18 @@ export default function AcceptInvite() {
       setLoading(false);
     };
 
+    if (authLoading) return;
+    if (!user) { setLoading(false); return; }
     fetchInvite();
-  }, [token]);
+  }, [token, user, authLoading]);
 
   // If not logged in, redirect to auth with return URL
   useEffect(() => {
-    if (!authLoading && !user && !loading && invite && !error) {
+    if (!authLoading && !user) {
       const returnTo = `/invite/${token}`;
       navigate(`/auth?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
     }
-  }, [authLoading, user, loading, invite, error, token, navigate]);
+  }, [authLoading, user, token, navigate]);
 
   const handleAccept = async () => {
     if (!user || !invite) return;
