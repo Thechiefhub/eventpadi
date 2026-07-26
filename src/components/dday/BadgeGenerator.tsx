@@ -307,6 +307,7 @@ function BeautifulBadge({
 }
 
 export default function BadgeGenerator({ eventId, attendees, eventName, onGenerateMissingIds }: Props) {
+  const isMobile = useIsMobile();
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
   const badgeCardRef = useRef<HTMLDivElement>(null);
