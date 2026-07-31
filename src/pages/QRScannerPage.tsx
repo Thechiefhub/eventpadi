@@ -11,7 +11,8 @@ import { toast } from "sonner";
 
 type ScanResult = {
   ok: boolean;
-  status: "checked_in" | "already" | "not_found";
+  status: "checked_in" | "already" | "not_found" | "invalid";
+  reason?: string;
   attendee?: any;
   tierCounts?: Record<string, { total: number; checkedIn: number }>;
 };
@@ -91,6 +92,7 @@ export default function QRScannerPage() {
       if (r.tierCounts) setCounts(r.tierCounts);
       if (r.status === "checked_in") { feedback(true); toast.success(`✓ ${r.attendee?.name} checked in`); }
       else if (r.status === "already") { feedback(false); toast.info(`${r.attendee?.name} is already in`); }
+      else if (r.status === "invalid") { feedback(false); toast.error(r.reason || "Invalid or forged QR code"); }
       else { feedback(false); toast.error("Ticket not recognised"); }
     } catch (e: any) {
       toast.error(e.message || "Scan failed");
@@ -233,16 +235,26 @@ export default function QRScannerPage() {
                 : result.status === "already" ? <AlertTriangle className="h-8 w-8 text-[hsl(var(--sunset-gold))]" />
                 : <XCircle className="h-8 w-8 text-destructive" />}
               <div className="min-w-0 flex-1">
-                <p className="font-display font-bold">
+                <p className="font-display text-lg font-bold">
                   {result.status === "checked_in" ? `Welcome, ${result.attendee?.name}!`
                     : result.status === "already" ? `${result.attendee?.name} is already in`
+                    : result.status === "invalid" ? "Invalid ticket — do not admit"
                     : "Ticket not found"}
                 </p>
+                {result.status === "invalid" && (
+                  <p className="text-xs text-muted-foreground">{result.reason || "This QR code could not be verified for this event."}</p>
+                )}
                 {result.attendee && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    <Badge variant="secondary" className="mr-1">{(result.attendee.role || "General").toUpperCase()}</Badge>
-                    Admit {result.attendee.admits} · {result.attendee.ticket_id}
-                  </p>
+                  <div className="mt-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="secondary">{(result.attendee.role || "General").toUpperCase()}</Badge>
+                      <Badge className="gradient-sunset text-primary-foreground">Admits {result.attendee.admits}</Badge>
+                      <Badge variant="outline">{result.attendee.ticket_id}</Badge>
+                    </div>
+                    {(result.attendee.email || result.attendee.phone) && (
+                      <p className="truncate text-xs text-muted-foreground">{result.attendee.email || result.attendee.phone}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </CardContent>

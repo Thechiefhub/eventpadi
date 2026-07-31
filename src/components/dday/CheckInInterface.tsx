@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Search, QrCode, UserCheck, Undo2, X, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,20 +10,18 @@ import type { Attendee } from "@/hooks/useAttendees";
 
 interface Props {
   attendees: Attendee[];
+  eventId?: string;
   onCheckIn: (id: string) => Promise<boolean>;
   onUndoCheckIn: (id: string) => Promise<void>;
 }
 
-export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }: Props) {
+export default function CheckInInterface({ attendees, eventId, onCheckIn, onUndoCheckIn }: Props) {
   const [query, setQuery] = useState("");
-  const [scannerActive, setScannerActive] = useState(false);
   const [lastCheckedIn, setLastCheckedIn] = useState<Attendee | null>(null);
   const [showAll, setShowAll] = useState(true);
   const [visibleCount, setVisibleCount] = useState(30);
   const [statusFilter, setStatusFilter] = useState<"all" | "checked_in" | "not_checked_in">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const scannerRef = useRef<any>(null);
-  const scannerContainerRef = useRef<HTMLDivElement>(null);
 
   // Get unique roles
   const uniqueRoles = useMemo(() => {
@@ -68,54 +67,6 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
       setQuery("");
     }
   };
-
-  // QR Scanner
-  const startScanner = async () => {
-    setScannerActive(true);
-    const { Html5Qrcode } = await import("html5-qrcode");
-    setTimeout(() => {
-      if (!scannerContainerRef.current) return;
-      const scanner = new Html5Qrcode("qr-reader");
-      scannerRef.current = scanner;
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          const found = attendees.find(
-            (a) =>
-              a.ticket_id === decodedText ||
-              a.email === decodedText ||
-              a.id === decodedText
-          );
-          if (found && !found.checked_in) {
-            onCheckIn(found.id).then((ok) => {
-              if (ok) setLastCheckedIn({ ...found, checked_in: true });
-            });
-          } else if (found?.checked_in) {
-            setLastCheckedIn(found);
-          } else {
-            setQuery(decodedText);
-          }
-          stopScanner();
-        },
-        () => {}
-      ).catch(() => {
-        setScannerActive(false);
-      });
-    }, 100);
-  };
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {});
-      scannerRef.current = null;
-    }
-    setScannerActive(false);
-  };
-
-  useEffect(() => {
-    return () => { stopScanner(); };
-  }, []);
 
   const checkedInCount = attendees.filter(a => a.checked_in).length;
 
@@ -190,23 +141,13 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
         />
       </div>
 
-      {/* QR Scanner Toggle */}
-      <div className="flex gap-2">
-        <Button
-          variant={scannerActive ? "destructive" : "outline"}
-          className="flex-1"
-          onClick={scannerActive ? stopScanner : startScanner}
-        >
-          <QrCode className="h-4 w-4 mr-2" />
-          {scannerActive ? "Stop Scanner" : "Scan QR Code"}
+      {/* QR scanning lives in one place — the full-screen verified scanner */}
+      {eventId && (
+        <Button asChild className="w-full gradient-sunset text-primary-foreground">
+          <Link to={`/scan/${eventId}`}>
+            <QrCode className="h-4 w-4 mr-2" /> Scan QR Code
+          </Link>
         </Button>
-      </div>
-
-      {/* QR Scanner View */}
-      {scannerActive && (
-        <div className="rounded-lg overflow-hidden border border-border">
-          <div id="qr-reader" ref={scannerContainerRef} className="w-full" />
-        </div>
       )}
 
       {/* Filters */}
@@ -286,7 +227,7 @@ export default function CheckInInterface({ attendees, onCheckIn, onUndoCheckIn }
         </div>
       )}
 
-      {attendees.length === 0 && !scannerActive && (
+      {attendees.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <UserCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="font-display">No attendees uploaded yet</p>

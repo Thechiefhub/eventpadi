@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
 import { buildQrPayload } from "@/lib/ticket";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   eventId: string;
@@ -308,6 +309,7 @@ function BeautifulBadge({
 }
 
 export default function BadgeGenerator({ eventId, attendees, eventName, onGenerateMissingIds }: Props) {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
@@ -363,7 +365,9 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       // SVG uploads pass through — they scale cleanly on their own.
       const { blob, ext, contentType } = await normalizeLogo(file);
       setLogoProgress(45);
-      const path = `org-logos/${eventId}-${Date.now()}.${ext}`;
+      // Storage RLS requires the first folder segment to be the owner's uid.
+      if (!user) throw new Error("You must be signed in to upload a logo.");
+      const path = `${user.id}/org-logos/${eventId}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("event-flyers")
         .upload(path, blob, { upsert: true, contentType, cacheControl: "3600" });
@@ -385,6 +389,8 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
         toast.error("Network error while uploading logo. Check your connection and try again.", {
           action: { label: "Retry", onClick: () => handleLogoUpload(file) },
         });
+      } else if (/row-level security|violates row-level/i.test(msg)) {
+        toast.error("Upload blocked — only the event owner can change this logo while signed in.");
       } else if (/dimensions|corrupt|encode|Canvas|decode/i.test(msg)) {
         toast.error(`Couldn't process the image: ${msg}. Try a different file (PNG or JPG works best).`);
       } else {
@@ -396,7 +402,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       setTimeout(() => setLogoProgress(0), 600);
       if (logoFileRef.current) logoFileRef.current.value = "";
     }
-  }, [eventId]);
+  }, [eventId, user]);
 
   const handleLogoRemove = useCallback(async () => {
     if (!eventId) return;
