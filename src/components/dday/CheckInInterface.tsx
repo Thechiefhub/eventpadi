@@ -227,7 +227,7 @@ export default function CheckInInterface({ attendees, eventId, onCheckIn, onUndo
         </div>
       )}
 
-      {attendees.length === 0 && !scannerActive && (
+      {attendees.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <UserCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="font-display">No attendees uploaded yet</p>
