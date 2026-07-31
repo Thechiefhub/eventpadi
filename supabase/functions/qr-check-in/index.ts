@@ -19,13 +19,13 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-function parseCode(raw: string): { ticket?: string; reg?: string; eventId?: string; fallback: string } {
+function parseCode(raw: string): { ticket?: string; reg?: string; eventId?: string; fallback: string; wasJson?: boolean } {
   const trimmed = (raw || "").trim();
   if (!trimmed) return { fallback: "" };
   if (trimmed.startsWith("{")) {
     try {
       const j = JSON.parse(trimmed);
-      return { ticket: j.t, reg: j.r, eventId: j.e, fallback: j.t || trimmed };
+      return { ticket: j.t, reg: j.r, eventId: j.e, fallback: j.t || trimmed, wasJson: true };
     } catch {}
   }
   return { fallback: trimmed };
@@ -60,15 +60,38 @@ Deno.serve(async (req) => {
   const parsed = parseCode(String(code));
   const lookup = parsed.ticket || parsed.fallback;
 
-  // Try to locate the attendee by ticket_id first, then id, then email
+  // Reject forged / tampered / cross-event QR payloads before touching the DB
+  const tierCountsEarly = async () => {
+    const { data } = await admin.from("attendees").select("role,checked_in").eq("event_id", eventId);
+    const out: Record<string, { total: number; checkedIn: number }> = {
+      General: { total: 0, checkedIn: 0 }, VIP: { total: 0, checkedIn: 0 }, VVIP: { total: 0, checkedIn: 0 },
+    };
+    (data || []).forEach((r: any) => {
+      const k = (r.role || "").toUpperCase() === "VVIP" ? "VVIP" : (r.role || "").toUpperCase() === "VIP" ? "VIP" : "General";
+      out[k].total += 1; if (r.checked_in) out[k].checkedIn += 1;
+    });
+    return out;
+  };
+  if (parsed.wasJson && (!parsed.ticket || (parsed.eventId && parsed.eventId !== eventId))) {
+    return new Response(JSON.stringify({
+      ok: false,
+      status: "invalid",
+      reason: parsed.ticket ? "This ticket belongs to a different event." : "QR code payload is not a valid ticket.",
+      tierCounts: await tierCountsEarly(),
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Locate the attendee by ticket_id first, then by attendee id.
+  // Email lookups are intentionally NOT accepted — an email is trivially forged.
   let attendee: any = null;
   for (const filter of [
     () => admin.from("attendees").select("*").eq("event_id", eventId).eq("ticket_id", lookup).maybeSingle(),
     () => admin.from("attendees").select("*").eq("event_id", eventId).eq("id", lookup).maybeSingle(),
-    () => admin.from("attendees").select("*").eq("event_id", eventId).eq("email", lookup).maybeSingle(),
   ]) {
-    const { data } = await filter();
-    if (data) { attendee = data; break; }
+    try {
+      const { data } = await filter();
+      if (data) { attendee = data; break; }
+    } catch { /* invalid uuid cast etc. — treat as no match */ }
   }
 
   // Tier counts helper
