@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Attendee } from "@/hooks/useAttendees";
 import { buildQrPayload } from "@/lib/ticket";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   eventId: string;
@@ -308,6 +309,7 @@ function BeautifulBadge({
 }
 
 export default function BadgeGenerator({ eventId, attendees, eventName, onGenerateMissingIds }: Props) {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const printRef = useRef<HTMLDivElement>(null);
   const singleBadgeRef = useRef<HTMLDivElement>(null);
