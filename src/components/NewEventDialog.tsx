@@ -194,7 +194,8 @@ export default function NewEventDialog({ onCreated, children }: NewEventDialogPr
           // they see in the preview is exactly what lands in every badge.
           const { blob, ext, contentType } = await normalizeLogoForUpload(logoFile);
           setLogoProgress(45);
-          const path = `org-logos/${created.id}-${Date.now()}.${ext}`;
+          // Storage RLS requires the first folder segment to be the owner's uid.
+          const path = `${user.id}/org-logos/${created.id}-${Date.now()}.${ext}`;
           const { error: upErr } = await supabase.storage
             .from("event-flyers")
             .upload(path, blob, { upsert: true, contentType, cacheControl: "3600" });
