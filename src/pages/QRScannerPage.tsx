@@ -338,6 +338,53 @@ export default function QRScannerPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Conflict flow — explains duplicate / invalid badges without stopping the camera */}
+      <Dialog open={!!conflict} onOpenChange={(o) => { if (!o) setConflict(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-left">
+              {conflictCopy?.tone === "warning"
+                ? <AlertTriangle className="h-6 w-6 shrink-0 text-[hsl(var(--sunset-gold))]" />
+                : <XCircle className="h-6 w-6 shrink-0 text-destructive" />}
+              <span>{conflictCopy?.title}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">{conflictCopy?.explanation}</p>
+            {conflict?.attendee && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="font-semibold">{conflict.attendee.name}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary">{(conflict.attendee.role || "General").toUpperCase()}</Badge>
+                  <Badge className="gradient-sunset text-primary-foreground">Admits {conflict.attendee.admits}</Badge>
+                  <Badge variant="outline">{conflict.attendee.ticket_id}</Badge>
+                </div>
+                {conflict.status === "already" && conflict.checkedInAt && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    First entry {formatCheckedInAgo(conflict.checkedInAt)}
+                    {conflict.checkedInByName ? ` · scanned by ${conflict.checkedInByName}` : ""}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">What to do</p>
+              <p className="mt-1 text-sm text-foreground">{conflictCopy?.action}</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            {conflict?.status === "not_found" && (
+              <Button variant="outline" onClick={() => { setConflict(null); navigate("/dashboard/dday"); }}>
+                Open check-in list
+              </Button>
+            )}
+            <Button className="gradient-sunset text-primary-foreground" onClick={() => setConflict(null)}>
+              Keep scanning
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
