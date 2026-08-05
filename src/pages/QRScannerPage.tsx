@@ -126,7 +126,6 @@ export default function QRScannerPage() {
       await new Promise((r) => setTimeout(r, 80));
       const scanner = new Html5Qrcode("qr-scan-region", { verbose: false } as any);
       scannerRef.current = scanner;
-      const cameraSpec: any = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } };
       const config = {
         fps: 30,
         qrbox: (w: number, h: number) => {
