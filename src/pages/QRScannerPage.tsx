@@ -3,19 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-type ScanResult = {
-  ok: boolean;
-  status: "checked_in" | "already" | "not_found" | "invalid";
-  reason?: string;
-  attendee?: any;
-  tierCounts?: Record<string, { total: number; checkedIn: number }>;
-};
+import { describeScan, shouldSubmitScan, formatCheckedInAgo, type ScanResult } from "@/lib/scan-conflict";
 
 export default function QRScannerPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -25,6 +19,7 @@ export default function QRScannerPage() {
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [conflict, setConflict] = useState<ScanResult | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [counts, setCounts] = useState<Record<string, { total: number; checkedIn: number }>>({
     General: { total: 0, checkedIn: 0 }, VIP: { total: 0, checkedIn: 0 }, VVIP: { total: 0, checkedIn: 0 },
@@ -95,10 +90,15 @@ export default function QRScannerPage() {
       const r = data as ScanResult;
       setResult(r);
       if (r.tierCounts) setCounts(r.tierCounts);
-      if (r.status === "checked_in") { feedback(true); toast.success(`✓ ${r.attendee?.name} checked in`); }
-      else if (r.status === "already") { feedback(false); toast.info(`${r.attendee?.name} is already in`); }
-      else if (r.status === "invalid") { feedback(false); toast.error(r.reason || "Invalid or forged QR code"); }
-      else { feedback(false); toast.error("Ticket not recognised"); }
+      const copy = describeScan(r);
+      feedback(copy.tone === "success");
+      if (copy.tone === "success") {
+        toast.success(copy.title);
+      } else {
+        // Conflicts get an explicit, explained dialog — the camera keeps running
+        // underneath so the next badge is never delayed by the prompt.
+        setConflict(r);
+      }
     } catch (e: any) {
       toast.error(e.message || "Scan failed");
     } finally {
@@ -127,16 +127,16 @@ export default function QRScannerPage() {
       const scanner = new Html5Qrcode("qr-scan-region", { verbose: false } as any);
       scannerRef.current = scanner;
       const config = {
-        fps: 30,
+        fps: 25,
         qrbox: (w: number, h: number) => {
-          const side = Math.floor(Math.min(w, h) * 0.9);
+          const side = Math.floor(Math.min(w, h) * 0.92);
           return { width: side, height: side };
         },
         aspectRatio: 1.0,
         disableFlip: true,
         videoConstraints: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" }
-          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" },
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, focusMode: "continuous", advanced: [{ focusMode: "continuous" }, { exposureMode: "continuous" }] }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, focusMode: "continuous", advanced: [{ focusMode: "continuous" }, { exposureMode: "continuous" }] },
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         rememberLastUsedCamera: true,
       } as any;
@@ -146,7 +146,7 @@ export default function QRScannerPage() {
         (decoded: string) => {
           const now = Date.now();
           // De-dupe the same badge briefly, but never delay a different badge
-          if (decoded === lastScanRef.current.code && now - lastScanRef.current.at < 1200) return;
+          if (!shouldSubmitScan(decoded, lastScanRef.current, now)) return;
           lastScanRef.current = { code: decoded, at: now };
           void submitCode(decoded);
         },
@@ -198,11 +198,18 @@ export default function QRScannerPage() {
     if (authLoading || !user || !eventId || autoStartedRef.current) return;
     autoStartedRef.current = true;
     void startScanner();
+    // Warm the check-in function container + TLS connection so the very first
+    // real scan doesn't pay cold-start latency.
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qr-check-in`;
+      void fetch(url, { method: "OPTIONS", mode: "cors" }).catch(() => {});
+    } catch { /* warm-up is best effort */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, eventId]);
 
   const totalCi = useMemo(() => Object.values(counts).reduce((s, v) => s + v.checkedIn, 0), [counts]);
   const totalReg = useMemo(() => Object.values(counts).reduce((s, v) => s + v.total, 0), [counts]);
+  const conflictCopy = useMemo(() => (conflict ? describeScan(conflict) : null), [conflict]);
 
   if (authLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!user) {
@@ -253,15 +260,8 @@ export default function QRScannerPage() {
                 : result.status === "already" ? <AlertTriangle className="h-8 w-8 text-[hsl(var(--sunset-gold))]" />
                 : <XCircle className="h-8 w-8 text-destructive" />}
               <div className="min-w-0 flex-1">
-                <p className="font-display text-lg font-bold">
-                  {result.status === "checked_in" ? `Welcome, ${result.attendee?.name}!`
-                    : result.status === "already" ? `${result.attendee?.name} is already in`
-                    : result.status === "invalid" ? "Invalid ticket — do not admit"
-                    : "Ticket not found"}
-                </p>
-                {result.status === "invalid" && (
-                  <p className="text-xs text-muted-foreground">{result.reason || "This QR code could not be verified for this event."}</p>
-                )}
+                <p className="font-display text-lg font-bold">{describeScan(result).title}</p>
+                <p className="text-xs text-muted-foreground">{describeScan(result).explanation}</p>
                 {result.attendee && (
                   <div className="mt-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -338,6 +338,53 @@ export default function QRScannerPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Conflict flow — explains duplicate / invalid badges without stopping the camera */}
+      <Dialog open={!!conflict} onOpenChange={(o) => { if (!o) setConflict(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-left">
+              {conflictCopy?.tone === "warning"
+                ? <AlertTriangle className="h-6 w-6 shrink-0 text-[hsl(var(--sunset-gold))]" />
+                : <XCircle className="h-6 w-6 shrink-0 text-destructive" />}
+              <span>{conflictCopy?.title}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">{conflictCopy?.explanation}</p>
+            {conflict?.attendee && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="font-semibold">{conflict.attendee.name}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary">{(conflict.attendee.role || "General").toUpperCase()}</Badge>
+                  <Badge className="gradient-sunset text-primary-foreground">Admits {conflict.attendee.admits}</Badge>
+                  <Badge variant="outline">{conflict.attendee.ticket_id}</Badge>
+                </div>
+                {conflict.status === "already" && conflict.checkedInAt && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    First entry {formatCheckedInAgo(conflict.checkedInAt)}
+                    {conflict.checkedInByName ? ` · scanned by ${conflict.checkedInByName}` : ""}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">What to do</p>
+              <p className="mt-1 text-sm text-foreground">{conflictCopy?.action}</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            {conflict?.status === "not_found" && (
+              <Button variant="outline" onClick={() => { setConflict(null); navigate("/dashboard/dday"); }}>
+                Open check-in list
+              </Button>
+            )}
+            <Button className="gradient-sunset text-primary-foreground" onClick={() => setConflict(null)}>
+              Keep scanning
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
