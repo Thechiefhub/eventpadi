@@ -43,8 +43,6 @@ interface RegPage {
   vvip_enabled: boolean;
   capacity: number | null;
   is_published: boolean;
-  contact_email: string | null;
-  contact_phone: string | null;
 }
 
 interface Registration {
