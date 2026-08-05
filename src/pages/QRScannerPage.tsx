@@ -31,6 +31,8 @@ export default function QRScannerPage() {
   });
   const scannerRef = useRef<any>(null);
   const lastScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const autoStartedRef = useRef(false);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [activeCam, setActiveCam] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
@@ -82,7 +84,10 @@ export default function QRScannerPage() {
   }, [eventId]);
 
   const submitCode = async (code: string) => {
-    if (!eventId || !code || busy) return;
+    if (!eventId || !code) return;
+    // Allow back-to-back scans: only block the exact same code while it's in flight
+    if (inFlightRef.current.has(code)) return;
+    inFlightRef.current.add(code);
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("qr-check-in", { body: { eventId, code } });
@@ -97,6 +102,7 @@ export default function QRScannerPage() {
     } catch (e: any) {
       toast.error(e.message || "Scan failed");
     } finally {
+      inFlightRef.current.delete(code);
       setBusy(false);
     }
   };
@@ -120,25 +126,29 @@ export default function QRScannerPage() {
       await new Promise((r) => setTimeout(r, 80));
       const scanner = new Html5Qrcode("qr-scan-region", { verbose: false } as any);
       scannerRef.current = scanner;
-      const cameraSpec: any = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } };
       const config = {
-        fps: 15,
+        fps: 30,
         qrbox: (w: number, h: number) => {
-          const side = Math.floor(Math.min(w, h) * 0.75);
+          const side = Math.floor(Math.min(w, h) * 0.9);
           return { width: side, height: side };
         },
         aspectRatio: 1.0,
+        disableFlip: true,
+        videoConstraints: deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" },
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         rememberLastUsedCamera: true,
       } as any;
       await scanner.start(
-        cameraSpec,
+        config.videoConstraints,
         config,
         (decoded: string) => {
           const now = Date.now();
-          if (decoded === lastScanRef.current.code && now - lastScanRef.current.at < 2500) return;
+          // De-dupe the same badge briefly, but never delay a different badge
+          if (decoded === lastScanRef.current.code && now - lastScanRef.current.at < 1200) return;
           lastScanRef.current = { code: decoded, at: now };
-          submitCode(decoded);
+          void submitCode(decoded);
         },
         () => {}
       );
@@ -182,6 +192,14 @@ export default function QRScannerPage() {
   };
 
   useEffect(() => { return () => { void stopScanner(); }; }, []);
+
+  // Auto-start the camera the moment the page opens so a badge is captured instantly
+  useEffect(() => {
+    if (authLoading || !user || !eventId || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void startScanner();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, eventId]);
 
   const totalCi = useMemo(() => Object.values(counts).reduce((s, v) => s + v.checkedIn, 0), [counts]);
   const totalReg = useMemo(() => Object.values(counts).reduce((s, v) => s + v.total, 0), [counts]);
