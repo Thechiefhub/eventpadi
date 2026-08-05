@@ -43,8 +43,6 @@ interface RegPage {
   vvip_enabled: boolean;
   capacity: number | null;
   is_published: boolean;
-  contact_email: string | null;
-  contact_phone: string | null;
 }
 
 interface Registration {
@@ -68,6 +66,9 @@ export default function RegistrationModule() {
   const { events, selectedEventId, setSelectedEventId, loading: eventsLoading } = useEventSelect();
   const selectedEvent = events.find((e) => e.id === selectedEventId);
   const [page, setPage] = useState<RegPage | null>(null);
+  // Organizer contact details live in a private, owner-only table so they are
+  // never exposed on the public registration page.
+  const [contacts, setContacts] = useState<{ contact_email: string; contact_phone: string }>({ contact_email: "", contact_phone: "" });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -90,6 +91,16 @@ export default function RegistrationModule() {
         .eq("event_id", selectedEventId)
         .maybeSingle();
       setPage(data as RegPage | null);
+      if (data?.id) {
+        const { data: c } = await supabase
+          .from("event_registration_page_contacts")
+          .select("contact_email,contact_phone")
+          .eq("page_id", data.id)
+          .maybeSingle();
+        setContacts({ contact_email: c?.contact_email || "", contact_phone: c?.contact_phone || "" });
+      } else {
+        setContacts({ contact_email: "", contact_phone: "" });
+      }
       const { data: regs } = await supabase
         .from("event_registrations")
         .select("id,name,email,phone,ticket_tier,admits,amount,payment_status,created_at,attendee_id")
@@ -210,8 +221,6 @@ export default function RegistrationModule() {
       vvip_enabled: false,
       capacity: null,
       is_published: false,
-      contact_email: null,
-      contact_phone: null,
     };
     setPage(base);
     return base;
@@ -261,7 +270,22 @@ export default function RegistrationModule() {
     if (resp.error) {
       toast.error(resp.error.message);
     } else {
-      setPage(resp.data as RegPage);
+      const saved = resp.data as RegPage;
+      setPage(saved);
+      if (saved?.id) {
+        const { error: cErr } = await supabase
+          .from("event_registration_page_contacts")
+          .upsert(
+            {
+              page_id: saved.id,
+              user_id: user.id,
+              contact_email: contacts.contact_email.trim() || null,
+              contact_phone: contacts.contact_phone.trim() || null,
+            },
+            { onConflict: "page_id" }
+          );
+        if (cErr) toast.error(cErr.message);
+      }
       toast.success(publish === true ? "Published! Share your link." : publish === false ? "Unpublished" : "Saved");
     }
     setSaving(false);
@@ -433,11 +457,12 @@ export default function RegistrationModule() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Contact Email</Label>
-                  <Input type="email" value={page.contact_email || ""} onChange={(e) => update({ contact_email: e.target.value })} />
+                  <Input type="email" value={contacts.contact_email} onChange={(e) => setContacts((c) => ({ ...c, contact_email: e.target.value }))} />
+                  <p className="text-[11px] text-muted-foreground">Private — kept for your records, not shown publicly.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Contact Phone</Label>
-                  <Input value={page.contact_phone || ""} onChange={(e) => update({ contact_phone: e.target.value })} />
+                  <Input value={contacts.contact_phone} onChange={(e) => setContacts((c) => ({ ...c, contact_phone: e.target.value }))} />
                 </div>
               </div>
 

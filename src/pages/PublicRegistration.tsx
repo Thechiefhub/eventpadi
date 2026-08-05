@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CalendarDays, MapPin, Mail, Phone, Ticket, CheckCircle2, Sparkles, Download, MessageCircle, Check } from "lucide-react";
+import { Loader2, CalendarDays, MapPin, Ticket, CheckCircle2, Sparkles, Download, MessageCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { QRCodeSVG } from "qrcode.react";
@@ -205,8 +205,6 @@ export default function PublicRegistration() {
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
             {page.start_at && <span className="inline-flex items-center gap-1"><CalendarDays className="h-4 w-4" />{new Date(page.start_at).toLocaleString()}</span>}
             {(page.location || page.venue_address) && <span className="inline-flex items-center gap-1"><MapPin className="h-4 w-4" />{[page.venue_address, page.location].filter(Boolean).join(", ")}</span>}
-            {page.contact_email && <span className="inline-flex items-center gap-1"><Mail className="h-4 w-4" />{page.contact_email}</span>}
-            {page.contact_phone && <span className="inline-flex items-center gap-1"><Phone className="h-4 w-4" />{page.contact_phone}</span>}
           </div>
         </div>
 

@@ -268,11 +268,47 @@ export type Database = {
           },
         ]
       }
+      event_registration_page_contacts: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          page_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          page_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          page_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registration_page_contacts_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: true
+            referencedRelation: "event_registration_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_registration_pages: {
         Row: {
           capacity: number | null
-          contact_email: string | null
-          contact_phone: string | null
           created_at: string
           currency: string | null
           description: string | null
@@ -298,8 +334,6 @@ export type Database = {
         }
         Insert: {
           capacity?: number | null
-          contact_email?: string | null
-          contact_phone?: string | null
           created_at?: string
           currency?: string | null
           description?: string | null
@@ -325,8 +359,6 @@ export type Database = {
         }
         Update: {
           capacity?: number | null
-          contact_email?: string | null
-          contact_phone?: string | null
           created_at?: string
           currency?: string | null
           description?: string | null
@@ -772,14 +804,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_event_member: {
-        Args: { _email: string; _event_id: string; _user_id: string }
-        Returns: boolean
-      }
-      is_event_owner: {
-        Args: { _event_id: string; _user_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
