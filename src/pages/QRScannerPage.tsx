@@ -198,6 +198,12 @@ export default function QRScannerPage() {
     if (authLoading || !user || !eventId || autoStartedRef.current) return;
     autoStartedRef.current = true;
     void startScanner();
+    // Warm the check-in function container + TLS connection so the very first
+    // real scan doesn't pay cold-start latency.
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qr-check-in`;
+      void fetch(url, { method: "OPTIONS", mode: "cors" }).catch(() => {});
+    } catch { /* warm-up is best effort */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, eventId]);
 
