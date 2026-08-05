@@ -3,19 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-type ScanResult = {
-  ok: boolean;
-  status: "checked_in" | "already" | "not_found" | "invalid";
-  reason?: string;
-  attendee?: any;
-  tierCounts?: Record<string, { total: number; checkedIn: number }>;
-};
+import { describeScan, shouldSubmitScan, formatCheckedInAgo, type ScanResult } from "@/lib/scan-conflict";
 
 export default function QRScannerPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -25,6 +19,7 @@ export default function QRScannerPage() {
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [conflict, setConflict] = useState<ScanResult | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [counts, setCounts] = useState<Record<string, { total: number; checkedIn: number }>>({
     General: { total: 0, checkedIn: 0 }, VIP: { total: 0, checkedIn: 0 }, VVIP: { total: 0, checkedIn: 0 },
@@ -95,10 +90,15 @@ export default function QRScannerPage() {
       const r = data as ScanResult;
       setResult(r);
       if (r.tierCounts) setCounts(r.tierCounts);
-      if (r.status === "checked_in") { feedback(true); toast.success(`✓ ${r.attendee?.name} checked in`); }
-      else if (r.status === "already") { feedback(false); toast.info(`${r.attendee?.name} is already in`); }
-      else if (r.status === "invalid") { feedback(false); toast.error(r.reason || "Invalid or forged QR code"); }
-      else { feedback(false); toast.error("Ticket not recognised"); }
+      const copy = describeScan(r);
+      feedback(copy.tone === "success");
+      if (copy.tone === "success") {
+        toast.success(copy.title);
+      } else {
+        // Conflicts get an explicit, explained dialog — the camera keeps running
+        // underneath so the next badge is never delayed by the prompt.
+        setConflict(r);
+      }
     } catch (e: any) {
       toast.error(e.message || "Scan failed");
     } finally {
@@ -127,16 +127,16 @@ export default function QRScannerPage() {
       const scanner = new Html5Qrcode("qr-scan-region", { verbose: false } as any);
       scannerRef.current = scanner;
       const config = {
-        fps: 30,
+        fps: 25,
         qrbox: (w: number, h: number) => {
-          const side = Math.floor(Math.min(w, h) * 0.9);
+          const side = Math.floor(Math.min(w, h) * 0.92);
           return { width: side, height: side };
         },
         aspectRatio: 1.0,
         disableFlip: true,
         videoConstraints: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" }
-          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 }, focusMode: "continuous" },
+          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, focusMode: "continuous", advanced: [{ focusMode: "continuous" }, { exposureMode: "continuous" }] }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, focusMode: "continuous", advanced: [{ focusMode: "continuous" }, { exposureMode: "continuous" }] },
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         rememberLastUsedCamera: true,
       } as any;
@@ -146,7 +146,7 @@ export default function QRScannerPage() {
         (decoded: string) => {
           const now = Date.now();
           // De-dupe the same badge briefly, but never delay a different badge
-          if (decoded === lastScanRef.current.code && now - lastScanRef.current.at < 1200) return;
+          if (!shouldSubmitScan(decoded, lastScanRef.current, now)) return;
           lastScanRef.current = { code: decoded, at: now };
           void submitCode(decoded);
         },
@@ -203,6 +203,7 @@ export default function QRScannerPage() {
 
   const totalCi = useMemo(() => Object.values(counts).reduce((s, v) => s + v.checkedIn, 0), [counts]);
   const totalReg = useMemo(() => Object.values(counts).reduce((s, v) => s + v.total, 0), [counts]);
+  const conflictCopy = useMemo(() => (conflict ? describeScan(conflict) : null), [conflict]);
 
   if (authLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!user) {
