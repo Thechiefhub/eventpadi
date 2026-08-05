@@ -260,15 +260,8 @@ export default function QRScannerPage() {
                 : result.status === "already" ? <AlertTriangle className="h-8 w-8 text-[hsl(var(--sunset-gold))]" />
                 : <XCircle className="h-8 w-8 text-destructive" />}
               <div className="min-w-0 flex-1">
-                <p className="font-display text-lg font-bold">
-                  {result.status === "checked_in" ? `Welcome, ${result.attendee?.name}!`
-                    : result.status === "already" ? `${result.attendee?.name} is already in`
-                    : result.status === "invalid" ? "Invalid ticket — do not admit"
-                    : "Ticket not found"}
-                </p>
-                {result.status === "invalid" && (
-                  <p className="text-xs text-muted-foreground">{result.reason || "This QR code could not be verified for this event."}</p>
-                )}
+                <p className="font-display text-lg font-bold">{describeScan(result).title}</p>
+                <p className="text-xs text-muted-foreground">{describeScan(result).explanation}</p>
                 {result.attendee && (
                   <div className="mt-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-1.5">
