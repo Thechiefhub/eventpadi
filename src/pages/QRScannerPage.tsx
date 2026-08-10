@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw, Timer } from "lucide-react";
+import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw, CornerDownLeft } from "lucide-react";
 import { toast } from "sonner";
 import { describeScan, shouldSubmitScan, formatCheckedInAgo, type ScanResult } from "@/lib/scan-conflict";
 
@@ -214,6 +214,24 @@ export default function QRScannerPage() {
     setScanning(false);
   };
 
+  const clearResult = useCallback(() => {
+    setHoldUntil(0);
+    setResult(null);
+    lastScanRef.current = { code: "", at: 0 };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Enter/Space clears the current result so the next badge can scan immediately.
+      if ((e.key === "Enter" || e.key === " ") && result) {
+        e.preventDefault();
+        clearResult();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [result, clearResult]);
+
   useEffect(() => { return () => { void stopScanner(); }; }, []);
 
   // Auto-start the camera the moment the page opens so a badge is captured instantly
@@ -271,51 +289,86 @@ export default function QRScannerPage() {
           </CardContent>
         </Card>
 
-        {/* Result banner */}
+        {/* Result banner — designed for fast, at-a-glance door decisions */}
         {result && (
-          <Card className={
-            result.status === "checked_in" ? "border-[hsl(var(--earth-green))] bg-[hsl(var(--earth-green)/0.1)]"
-            : result.status === "already" ? "border-[hsl(var(--sunset-gold))] bg-[hsl(var(--sunset-gold)/0.1)]"
-            : "border-destructive bg-destructive/10"
-          }>
-            <CardContent className="flex items-center gap-3 p-4">
-              {result.status === "checked_in" ? <CheckCircle2 className="h-8 w-8 text-[hsl(var(--earth-green))]" />
-                : result.status === "already" ? <AlertTriangle className="h-8 w-8 text-[hsl(var(--sunset-gold))]" />
-                : <XCircle className="h-8 w-8 text-destructive" />}
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-lg font-bold">{describeScan(result).title}</p>
-                {result.attendee?.name && (
-                  <p className="font-display text-2xl font-bold leading-tight text-foreground">{result.attendee.name}</p>
-                )}
-                <p className="text-xs text-muted-foreground">{describeScan(result).explanation}</p>
-                {result.attendee && (
-                  <div className="mt-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="secondary">{(result.attendee.role || "General").toUpperCase()}</Badge>
-                      <Badge className="gradient-sunset text-primary-foreground">Admits {result.attendee.admits}</Badge>
-                      <Badge variant="outline">{result.attendee.ticket_id}</Badge>
+          <Card
+            className={
+              result.status === "checked_in"
+                ? "border-2 border-[hsl(var(--earth-green))] bg-[hsl(var(--earth-green)/0.12)] shadow-lg"
+                : result.status === "already"
+                ? "border-2 border-[hsl(var(--sunset-gold))] bg-[hsl(var(--sunset-gold)/0.12)] shadow-lg"
+                : "border-2 border-destructive bg-destructive/10 shadow-lg"
+            }
+          >
+            <CardContent className="p-4">
+              {/* Big status verdict */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {result.status === "checked_in" ? (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--earth-green))]/20">
+                      <CheckCircle2 className="h-7 w-7 text-[hsl(var(--earth-green))]" />
                     </div>
-                    {(result.attendee.email || result.attendee.phone) && (
-                      <p className="truncate text-xs text-muted-foreground">{result.attendee.email || result.attendee.phone}</p>
-                    )}
+                  ) : result.status === "already" ? (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--sunset-gold))]/20">
+                      <AlertTriangle className="h-7 w-7 text-[hsl(var(--sunset-gold))]" />
+                    </div>
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20">
+                      <XCircle className="h-7 w-7 text-destructive" />
+                    </div>
+                  )}
+                  <div>
+                    <p
+                      className={
+                        "font-display text-lg font-bold " +
+                        (result.status === "checked_in"
+                          ? "text-[hsl(var(--earth-green))]"
+                          : result.status === "already"
+                          ? "text-[hsl(var(--sunset-gold))]"
+                          : "text-destructive")
+                      }
+                    >
+                      {result.status === "checked_in" ? "ADMIT — CHECKED IN" : result.status === "already" ? "ALREADY INSIDE — HOLD" : "DO NOT ADMIT"}
+                    </p>
+                    <p className="text-xs font-medium text-muted-foreground">{describeScan(result).title}</p>
+                  </div>
+                </div>
+                {holdLeft > 0 && (
+                  <div className="text-right">
+                    <p className="font-display text-2xl font-bold tabular-nums leading-none">{holdLeft}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">seconds left</p>
                   </div>
                 )}
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  {holdLeft > 0 ? (
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <Timer className="h-3.5 w-3.5" /> Showing details for {holdLeft}s
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Ready for the next badge</span>
+              </div>
+
+              {/* Attendee details */}
+              {result.attendee?.name && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-background/50 p-3">
+                  <p className="font-display text-3xl font-bold leading-tight text-foreground">{result.attendee.name}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="text-sm">{(result.attendee.role || "General").toUpperCase()}</Badge>
+                    <Badge className="gradient-sunset text-primary-foreground text-sm">Admits {result.attendee.admits}</Badge>
+                    <Badge variant="outline" className="text-sm">{result.attendee.ticket_id}</Badge>
+                  </div>
+                  {(result.attendee.email || result.attendee.phone) && (
+                    <p className="mt-2 truncate text-xs text-muted-foreground">{result.attendee.email || result.attendee.phone}</p>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setHoldUntil(0); setResult(null); lastScanRef.current = { code: "", at: 0 }; }}
-                  >
-                    Scan next attendee
-                  </Button>
                 </div>
+              )}
+
+              <p className="mt-3 text-xs text-muted-foreground">{describeScan(result).explanation}</p>
+
+              {/* Primary action: huge, fast next-scan button */}
+              <div className="mt-4 flex flex-col gap-2">
+                <Button
+                  size="lg"
+                  className="gradient-sunset h-14 w-full text-base font-bold text-primary-foreground"
+                  onClick={clearResult}
+                  autoFocus
+                >
+                  <CornerDownLeft className="mr-2 h-5 w-5" /> Scan next attendee
+                </Button>
+                <p className="text-center text-[10px] text-muted-foreground">Press Enter or Space to clear and continue</p>
               </div>
             </CardContent>
           </Card>
