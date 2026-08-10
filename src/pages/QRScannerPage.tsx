@@ -214,6 +214,24 @@ export default function QRScannerPage() {
     setScanning(false);
   };
 
+  const clearResult = useCallback(() => {
+    setHoldUntil(0);
+    setResult(null);
+    lastScanRef.current = { code: "", at: 0 };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Enter/Space clears the current result so the next badge can scan immediately.
+      if ((e.key === "Enter" || e.key === " ") && result) {
+        e.preventDefault();
+        clearResult();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [result, clearResult]);
+
   useEffect(() => { return () => { void stopScanner(); }; }, []);
 
   // Auto-start the camera the moment the page opens so a badge is captured instantly
