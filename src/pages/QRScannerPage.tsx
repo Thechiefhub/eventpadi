@@ -166,8 +166,10 @@ export default function QRScannerPage() {
         config,
         (decoded: string) => {
           const now = Date.now();
-          // De-dupe the same badge briefly, but never delay a different badge
-          if (!shouldSubmitScan(decoded, lastScanRef.current, now)) return;
+          // Hold the same badge for the whole review window (so it never flips
+          // to "already checked in" while the team is verifying), but never
+          // delay a *different* badge — the next attendee scans immediately.
+          if (!shouldSubmitScan(decoded, lastScanRef.current, now, HOLD_MS)) return;
           lastScanRef.current = { code: decoded, at: now };
           void submitCode(decoded);
         },
