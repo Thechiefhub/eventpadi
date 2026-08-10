@@ -7,9 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, AlertTriangle, ScanLine, Zap, ZapOff, RefreshCw, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { describeScan, shouldSubmitScan, formatCheckedInAgo, type ScanResult } from "@/lib/scan-conflict";
+
+/** How long an attendee's details stay on screen after a scan, so the door
+ *  team can verify them before the next badge is processed. */
+const HOLD_MS = 30000;
 
 export default function QRScannerPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -32,6 +36,21 @@ export default function QRScannerPage() {
   const [activeCam, setActiveCam] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
+  const [holdUntil, setHoldUntil] = useState(0);
+  const [holdLeft, setHoldLeft] = useState(0);
+
+  // Countdown for the review window
+  useEffect(() => {
+    if (!holdUntil) { setHoldLeft(0); return; }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((holdUntil - Date.now()) / 1000));
+      setHoldLeft(left);
+      if (left === 0) setHoldUntil(0);
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [holdUntil]);
 
   const feedback = (ok: boolean) => {
     try {
@@ -92,6 +111,8 @@ export default function QRScannerPage() {
       if (r.tierCounts) setCounts(r.tierCounts);
       const copy = describeScan(r);
       feedback(copy.tone === "success");
+      // Keep the attendee's details on screen for the review window.
+      setHoldUntil(Date.now() + HOLD_MS);
       if (copy.tone === "success") {
         toast.success(copy.title);
       } else {
@@ -145,8 +166,10 @@ export default function QRScannerPage() {
         config,
         (decoded: string) => {
           const now = Date.now();
-          // De-dupe the same badge briefly, but never delay a different badge
-          if (!shouldSubmitScan(decoded, lastScanRef.current, now)) return;
+          // Hold the same badge for the whole review window (so it never flips
+          // to "already checked in" while the team is verifying), but never
+          // delay a *different* badge — the next attendee scans immediately.
+          if (!shouldSubmitScan(decoded, lastScanRef.current, now, HOLD_MS)) return;
           lastScanRef.current = { code: decoded, at: now };
           void submitCode(decoded);
         },
@@ -261,6 +284,9 @@ export default function QRScannerPage() {
                 : <XCircle className="h-8 w-8 text-destructive" />}
               <div className="min-w-0 flex-1">
                 <p className="font-display text-lg font-bold">{describeScan(result).title}</p>
+                {result.attendee?.name && (
+                  <p className="font-display text-2xl font-bold leading-tight text-foreground">{result.attendee.name}</p>
+                )}
                 <p className="text-xs text-muted-foreground">{describeScan(result).explanation}</p>
                 {result.attendee && (
                   <div className="mt-1 space-y-1">
@@ -274,6 +300,22 @@ export default function QRScannerPage() {
                     )}
                   </div>
                 )}
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  {holdLeft > 0 ? (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Timer className="h-3.5 w-3.5" /> Showing details for {holdLeft}s
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Ready for the next badge</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setHoldUntil(0); setResult(null); lastScanRef.current = { code: "", at: 0 }; }}
+                  >
+                    Scan next attendee
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
