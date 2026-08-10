@@ -284,6 +284,9 @@ export default function QRScannerPage() {
                 : <XCircle className="h-8 w-8 text-destructive" />}
               <div className="min-w-0 flex-1">
                 <p className="font-display text-lg font-bold">{describeScan(result).title}</p>
+                {result.attendee?.name && (
+                  <p className="font-display text-2xl font-bold leading-tight text-foreground">{result.attendee.name}</p>
+                )}
                 <p className="text-xs text-muted-foreground">{describeScan(result).explanation}</p>
                 {result.attendee && (
                   <div className="mt-1 space-y-1">
@@ -297,6 +300,22 @@ export default function QRScannerPage() {
                     )}
                   </div>
                 )}
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  {holdLeft > 0 ? (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Timer className="h-3.5 w-3.5" /> Showing details for {holdLeft}s
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Ready for the next badge</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setHoldUntil(0); setResult(null); lastScanRef.current = { code: "", at: 0 }; }}
+                  >
+                    Scan next attendee
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
