@@ -121,7 +121,7 @@ type ShareLog = {
 
 const BADGE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: #f7fee7; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; }
   .badge { page-break-inside: avoid; }
   .badge svg { margin: 0 auto; display: block; }
@@ -202,7 +202,7 @@ function BeautifulBadge({
         width,
         borderRadius: 18,
         overflow: "hidden",
-        background: "linear-gradient(135deg,#4f46e5 0%,#ec4899 45%,#f59e0b 100%)",
+        background: "linear-gradient(135deg,#166534 0%,#22c55e 45%,#facc15 100%)",
         fontFamily: "'Space Grotesk','Segoe UI',sans-serif",
         color: "#ffffff",
         boxShadow: "0 10px 30px -10px rgba(15,23,42,0.35)",
@@ -234,7 +234,7 @@ function BeautifulBadge({
           <div
             style={{
               ...logoContainerStyle,
-              background: "linear-gradient(135deg,#f59e0b 0%,#ec4899 50%,#4f46e5 100%)",
+              background: "linear-gradient(135deg,#facc15 0%,#22c55e 50%,#166534 100%)",
               border: "2px solid rgba(255,255,255,0.45)",
             }}
           >
@@ -264,17 +264,17 @@ function BeautifulBadge({
             fontWeight: 900,
             letterSpacing: 5,
             margin: 0,
-            color: "#fff7ed",
+            color: "#fefce8",
             textShadow: "0 2px 10px rgba(0,0,0,0.35), 0 0 1px rgba(255,255,255,0.6)",
           }}
         >
           CONFIRMED
         </h2>
-        <div style={{ width: 56, height: 3, background: "#fde68a", borderRadius: 99, margin: "6px auto 0" }} />
+        <div style={{ width: 56, height: 3, background: "#facc15", borderRadius: 99, margin: "6px auto 0" }} />
       </div>
 
       {/* QR card */}
-      <div style={{ background: "#ffffff", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "#0f172a", textAlign: "center" }}>
+      <div style={{ background: "#ffffff", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "#14532d", textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
           <QRCodeSVG
             value={qrValue}
@@ -287,7 +287,7 @@ function BeautifulBadge({
         <p style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", letterSpacing: 2, margin: "6px 0 8px" }}>
           {ticket}
         </p>
-        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "#0f172a" }}>{a.name}</p>
+        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "#14532d" }}>{a.name}</p>
         {(a.email || a.phone) && (
           <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 8px", wordBreak: "break-word" }}>
             {a.email || a.phone}
@@ -295,11 +295,11 @@ function BeautifulBadge({
         )}
         <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
           {a.role && (
-            <span style={{ display: "inline-block", background: "linear-gradient(135deg,#f97316,#ec4899)", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+            <span style={{ display: "inline-block", background: "linear-gradient(135deg,#facc15,#16a34a)", color: "#14532d", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
               {a.role}
             </span>
           )}
-          <span style={{ display: "inline-block", background: "#0f172a", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+          <span style={{ display: "inline-block", background: "#14532d", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
             Admit {a.admits || 1}
           </span>
         </div>
@@ -884,7 +884,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <Card className="border-dashed">
         <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div
-            className="h-16 w-16 rounded-xl bg-gradient-to-br from-indigo-500 via-pink-500 to-amber-400 flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0"
+            className="h-16 w-16 rounded-xl bg-gradient-to-br from-green-600 via-green-400 to-yellow-300 flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0"
             title={logoUrl ? "Current organiser logo" : "No logo uploaded"}
           >
             {logoUrl ? (
