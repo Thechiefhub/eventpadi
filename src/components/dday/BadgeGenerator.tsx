@@ -209,7 +209,7 @@ function BeautifulBadge({
       }}
     >
       {/* Header: logo + event */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", padding: "12px 14px", gap: 10 }}>
         {logoUrl ? (
           <div
             style={{
@@ -251,7 +251,22 @@ function BeautifulBadge({
             </span>
           </div>
         )}
-        <span style={{ fontSize: 10, opacity: 0.92, letterSpacing: 2, textTransform: "uppercase", textAlign: "right", lineHeight: 1.2, maxWidth: 200 }}>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: Math.max(11, Math.round(width * 0.042)),
+            fontWeight: 800,
+            opacity: 1,
+            letterSpacing: 1.2,
+            textTransform: "uppercase",
+            textAlign: "right",
+            lineHeight: 1.15,
+            color: "#ffffff",
+            textShadow: "0 1px 6px rgba(0,0,0,0.35)",
+            wordBreak: "break-word",
+          }}
+        >
           {eventName}
         </span>
       </div>
