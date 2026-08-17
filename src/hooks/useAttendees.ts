@@ -180,14 +180,26 @@ export function useAttendees(eventId: string, eventData?: { name: string; event_
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const genCode = () => {
       let code = "";
-      for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
       return `TKT-${code}`;
     };
+    // Guarantee uniqueness across every pass on this event, even for 1000+ badges.
+    const used = new Set(attendees.map((a) => a.ticket_id).filter(Boolean) as string[]);
+    let failed = 0;
     for (const a of missing) {
-      const ticket_id = genCode();
-      await supabase.from("attendees").update({ ticket_id }).eq("id", a.id);
+      let saved = false;
+      for (let attempt = 0; attempt < 6 && !saved; attempt++) {
+        let ticket_id = genCode();
+        while (used.has(ticket_id)) ticket_id = genCode();
+        // The DB unique index (event_id, ticket_id) is the final arbiter —
+        // a collision returns an error and we retry with a fresh code.
+        const { error } = await supabase.from("attendees").update({ ticket_id }).eq("id", a.id);
+        if (!error) { used.add(ticket_id); saved = true; }
+      }
+      if (!saved) failed += 1;
     }
-    toast.success(`Generated ${missing.length} ticket ID(s)`);
+    if (failed > 0) toast.error(`${failed} ticket ID(s) could not be generated — try again`);
+    toast.success(`Generated ${missing.length - failed} unique ticket ID(s)`);
     fetchAttendees();
   }, [attendees, fetchAttendees]);
 
