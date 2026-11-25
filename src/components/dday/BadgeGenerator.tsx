@@ -53,7 +53,7 @@ function applyVars(tpl: string, ctx: { name: string; event: string; ticket: stri
 }
 
 /**
- * Normalize an uploaded logo to a 512×512 white-background PNG so every badge
+ * Normalize an uploaded logo to a 512×512 transparent PNG so every badge
  * size — including the tiny excavation inside the QR — renders the same crisp
  * image without clipping, tainted canvas, or oversized payloads. SVGs pass
  * through untouched because they scale losslessly on their own.
@@ -73,8 +73,6 @@ async function normalizeLogo(file: File): Promise<{ blob: Blob; ext: string; con
         canvas.height = SIZE;
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas not supported in this browser");
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, SIZE, SIZE);
         const iw = img.naturalWidth || img.width;
         const ih = img.naturalHeight || img.height;
         if (!iw || !ih) throw new Error("Invalid image dimensions");
@@ -120,12 +118,17 @@ type ShareLog = {
 };
 
 const BADGE_STYLES = `
+  :root {
+    --badge-red: 0 100% 40.1961%;
+    --badge-alabaster: 46.6667 21.875% 91.9608%;
+    --badge-shadow: 0 10px 30px -10px hsl(var(--badge-red) / 0.35);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: #f7fee7; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: hsl(var(--badge-alabaster)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; }
   .badge { page-break-inside: avoid; }
   .badge svg { margin: 0 auto; display: block; }
-  @media print { .grid { padding: 0; } body { background: #fff; } }
+  @media print { .grid { padding: 0; } body { background: hsl(var(--badge-alabaster)); } }
 `;
 
 /**
@@ -177,7 +180,7 @@ function BeautifulBadge({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+    boxShadow: "var(--badge-shadow)",
     overflow: "hidden",
   };
 
@@ -202,10 +205,10 @@ function BeautifulBadge({
         width,
         borderRadius: 18,
         overflow: "hidden",
-        background: "linear-gradient(135deg,#166534 0%,#22c55e 45%,#facc15 100%)",
+        background: "hsl(var(--badge-red))",
         fontFamily: "'Space Grotesk','Segoe UI',sans-serif",
-        color: "#ffffff",
-        boxShadow: "0 10px 30px -10px rgba(15,23,42,0.35)",
+        color: "hsl(var(--badge-alabaster))",
+        boxShadow: "var(--badge-shadow)",
       }}
     >
       {/* Header: logo + event */}
@@ -214,7 +217,7 @@ function BeautifulBadge({
           <div
             style={{
               ...logoContainerStyle,
-              background: "#ffffff",
+              background: "hsl(var(--badge-alabaster))",
               padding: logoPad,
             }}
           >
@@ -234,16 +237,15 @@ function BeautifulBadge({
           <div
             style={{
               ...logoContainerStyle,
-              background: "linear-gradient(135deg,#facc15 0%,#22c55e 50%,#166534 100%)",
-              border: "2px solid rgba(255,255,255,0.45)",
+              background: "hsl(var(--badge-alabaster))",
+              border: "2px solid hsl(var(--badge-red))",
             }}
           >
             <span
               style={{
                 fontSize: initialFontSize,
                 fontWeight: 800,
-                color: "#fff",
-                textShadow: "0 1px 4px rgba(0,0,0,0.35)",
+                color: "hsl(var(--badge-red))",
                 lineHeight: 1,
               }}
             >
@@ -262,8 +264,7 @@ function BeautifulBadge({
             textTransform: "uppercase",
             textAlign: "right",
             lineHeight: 1.15,
-            color: "#ffffff",
-            textShadow: "0 1px 6px rgba(0,0,0,0.35)",
+            color: "hsl(var(--badge-alabaster))",
             wordBreak: "break-word",
           }}
         >
@@ -279,17 +280,16 @@ function BeautifulBadge({
             fontWeight: 900,
             letterSpacing: 5,
             margin: 0,
-            color: "#fefce8",
-            textShadow: "0 2px 10px rgba(0,0,0,0.35), 0 0 1px rgba(255,255,255,0.6)",
+            color: "hsl(var(--badge-alabaster))",
           }}
         >
           CONFIRMED
         </h2>
-        <div style={{ width: 56, height: 3, background: "#facc15", borderRadius: 99, margin: "6px auto 0" }} />
+        <div style={{ width: 56, height: 3, background: "hsl(var(--badge-alabaster))", borderRadius: 99, margin: "6px auto 0" }} />
       </div>
 
       {/* QR card */}
-      <div style={{ background: "#ffffff", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "#14532d", textAlign: "center" }}>
+      <div style={{ background: "hsl(var(--badge-alabaster))", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "hsl(var(--badge-red))", textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
           <QRCodeSVG
             value={qrValue}
@@ -299,22 +299,22 @@ function BeautifulBadge({
             imageSettings={qrImageSettings}
           />
         </div>
-        <p style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b", letterSpacing: 2, margin: "6px 0 8px" }}>
+        <p style={{ fontFamily: "monospace", fontSize: 11, color: "hsl(var(--badge-red) / 0.72)", letterSpacing: 2, margin: "6px 0 8px" }}>
           {ticket}
         </p>
-        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "#14532d" }}>{a.name}</p>
+        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "hsl(var(--badge-red))" }}>{a.name}</p>
         {(a.email || a.phone) && (
-          <p style={{ fontSize: 11, color: "#64748b", margin: "0 0 8px", wordBreak: "break-word" }}>
+          <p style={{ fontSize: 11, color: "hsl(var(--badge-red) / 0.72)", margin: "0 0 8px", wordBreak: "break-word" }}>
             {a.email || a.phone}
           </p>
         )}
         <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
           {a.role && (
-            <span style={{ display: "inline-block", background: "linear-gradient(135deg,#facc15,#16a34a)", color: "#14532d", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+            <span style={{ display: "inline-block", background: "hsl(var(--badge-red))", color: "hsl(var(--badge-alabaster))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
               {a.role}
             </span>
           )}
-          <span style={{ display: "inline-block", background: "#14532d", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+          <span style={{ display: "inline-block", background: "hsl(var(--badge-red))", color: "hsl(var(--badge-alabaster))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
             Admit {a.admits || 1}
           </span>
         </div>
@@ -488,7 +488,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
     if (!badgeCardRef.current || !selectedAttendee) return;
     setDownloading(true);
     try {
-      const dataUrl = await toPng(badgeCardRef.current, { pixelRatio: 3, backgroundColor: "#ffffff" });
+      const dataUrl = await toPng(badgeCardRef.current, { pixelRatio: 3 });
       const link = document.createElement("a");
       link.download = `badge-${selectedAttendee.name.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = dataUrl;
@@ -513,7 +513,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
         const a = attendees[i];
         const node = document.getElementById(`bulk-badge-${a.id}`);
         if (!node) continue;
-        const dataUrl = await toPng(node, { pixelRatio: 3, backgroundColor: "#ffffff" });
+        const dataUrl = await toPng(node, { pixelRatio: 3 });
         const base64 = dataUrl.split(",")[1];
         const safeName = a.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
         folder.file(`${safeName || "badge"}-${(a.ticket_id || a.id.slice(0, 6)).replace(/[^a-z0-9]+/gi, "")}.png`, base64, { base64: true });
@@ -537,7 +537,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   // Generate a PNG data URL for the currently selected badge
   const renderBadgePngDataUrl = useCallback(async () => {
     if (!badgeCardRef.current) return null;
-    return await toPng(badgeCardRef.current, { pixelRatio: 3, backgroundColor: "#ffffff" });
+    return await toPng(badgeCardRef.current, { pixelRatio: 3 });
   }, []);
 
   // Build context object for variable substitution
@@ -553,7 +553,7 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
   const renderAttendeeBadgePng = useCallback(async (a: Attendee): Promise<string | null> => {
     const node = document.getElementById(`bulk-badge-${a.id}`);
     if (!node) return null;
-    return await toPng(node, { pixelRatio: 3, backgroundColor: "#ffffff" });
+    return await toPng(node, { pixelRatio: 3 });
   }, []);
 
   // Send a single badge via the edge function (used by single-share AND share-all)
@@ -899,13 +899,13 @@ export default function BadgeGenerator({ eventId, attendees, eventName, onGenera
       <Card className="border-dashed">
         <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div
-            className="h-16 w-16 rounded-xl bg-gradient-to-br from-green-600 via-green-400 to-yellow-300 flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0"
+            className="badge-surface h-16 w-16 rounded-lg flex items-center justify-center overflow-hidden border-2 border-border shadow-md shrink-0"
             title={logoUrl ? "Current organiser logo" : "No logo uploaded"}
           >
             {logoUrl ? (
-              <img src={logoUrl} alt="Organiser logo" className="h-full w-full object-contain bg-white" />
+              <img src={logoUrl} alt="Organiser logo" className="badge-surface-soft h-full w-full object-contain" />
             ) : (
-              <span className="text-white font-black text-2xl">
+              <span className="font-black text-2xl">
                 {(eventName || "E").charAt(0).toUpperCase()}
               </span>
             )}

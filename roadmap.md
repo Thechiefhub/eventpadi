@@ -1,0 +1,3 @@
+- [ ] Rebrand the event-discovery homepage with royal blue and light cream while keeping filters and organizer links.
+- [ ] Recolor QR badges to deep red (#CD0000) and Alabaster (#EFEDE6), preserving unique QR rendering and logo fitting.
+- [ ] Run the app’s existing checks, inspect the updated preview, and fix any verified errors.
