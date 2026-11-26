@@ -119,20 +119,22 @@ type ShareLog = {
 
 const BADGE_STYLES = `
   :root {
-    --badge-red: 0 100% 40.1961%;
-    --badge-alabaster: 46.6667 21.875% 91.9608%;
-    --badge-shadow: 0 10px 30px -10px hsl(var(--badge-red) / 0.35);
+    --badge-black: 0 0% 7%;
+    --badge-white: 0 0% 100%;
+    --badge-paper: 0 0% 96%;
+    --badge-muted: 0 0% 42%;
+    --badge-shadow: 0 8px 24px -12px hsl(var(--badge-black) / 0.42);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: hsl(var(--badge-alabaster)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; background: hsl(var(--badge-paper)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; }
   .badge { page-break-inside: avoid; }
   .badge svg { margin: 0 auto; display: block; }
-  @media print { .grid { padding: 0; } body { background: hsl(var(--badge-alabaster)); } }
+  @media print { .grid { padding: 0; } body { background: hsl(var(--badge-paper)); } }
 `;
 
 /**
- * Beautiful, print-ready badge with a vibrant gradient, "CONFIRMED" headline,
+ * Print-ready badge with crisp black-and-white contrast and a "CONFIRMED" headline,
  * organiser logo at the top-left and a clean QR card. All styling is inline
  * so the same markup renders identically in-app, in the print window and in
  * the html-to-image PNG export.
@@ -205,9 +207,9 @@ function BeautifulBadge({
         width,
         borderRadius: 18,
         overflow: "hidden",
-        background: "hsl(var(--badge-red))",
+        background: "hsl(var(--badge-black))",
         fontFamily: "'Space Grotesk','Segoe UI',sans-serif",
-        color: "hsl(var(--badge-alabaster))",
+        color: "hsl(var(--badge-white))",
         boxShadow: "var(--badge-shadow)",
       }}
     >
@@ -217,7 +219,7 @@ function BeautifulBadge({
           <div
             style={{
               ...logoContainerStyle,
-              background: "hsl(var(--badge-alabaster))",
+              background: "hsl(var(--badge-white))",
               padding: logoPad,
             }}
           >
@@ -237,15 +239,15 @@ function BeautifulBadge({
           <div
             style={{
               ...logoContainerStyle,
-              background: "hsl(var(--badge-alabaster))",
-              border: "2px solid hsl(var(--badge-red))",
+              background: "hsl(var(--badge-white))",
+              border: "2px solid hsl(var(--badge-black))",
             }}
           >
             <span
               style={{
                 fontSize: initialFontSize,
                 fontWeight: 800,
-                color: "hsl(var(--badge-red))",
+                color: "hsl(var(--badge-black))",
                 lineHeight: 1,
               }}
             >
@@ -264,7 +266,7 @@ function BeautifulBadge({
             textTransform: "uppercase",
             textAlign: "right",
             lineHeight: 1.15,
-            color: "hsl(var(--badge-alabaster))",
+            color: "hsl(var(--badge-white))",
             wordBreak: "break-word",
           }}
         >
@@ -280,16 +282,16 @@ function BeautifulBadge({
             fontWeight: 900,
             letterSpacing: 5,
             margin: 0,
-            color: "hsl(var(--badge-alabaster))",
+            color: "hsl(var(--badge-white))",
           }}
         >
           CONFIRMED
         </h2>
-        <div style={{ width: 56, height: 3, background: "hsl(var(--badge-alabaster))", borderRadius: 99, margin: "6px auto 0" }} />
+        <div style={{ width: 56, height: 3, background: "hsl(var(--badge-white))", borderRadius: 99, margin: "6px auto 0" }} />
       </div>
 
       {/* QR card */}
-      <div style={{ background: "hsl(var(--badge-alabaster))", margin: "0 14px 14px", borderRadius: 14, padding: 16, color: "hsl(var(--badge-red))", textAlign: "center" }}>
+      <div style={{ background: "hsl(var(--badge-white))", margin: "0 14px 14px", borderRadius: 14, border: "1px solid hsl(var(--badge-black) / 0.12)", padding: 16, color: "hsl(var(--badge-black))", textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
           <QRCodeSVG
             value={qrValue}
@@ -299,22 +301,22 @@ function BeautifulBadge({
             imageSettings={qrImageSettings}
           />
         </div>
-        <p style={{ fontFamily: "monospace", fontSize: 11, color: "hsl(var(--badge-red) / 0.72)", letterSpacing: 2, margin: "6px 0 8px" }}>
+        <p style={{ fontFamily: "monospace", fontSize: 11, color: "hsl(var(--badge-muted))", letterSpacing: 2, margin: "6px 0 8px" }}>
           {ticket}
         </p>
-        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "hsl(var(--badge-red))" }}>{a.name}</p>
+        <p style={{ fontSize: 17, fontWeight: 800, margin: "0 0 2px", color: "hsl(var(--badge-black))" }}>{a.name}</p>
         {(a.email || a.phone) && (
-          <p style={{ fontSize: 11, color: "hsl(var(--badge-red) / 0.72)", margin: "0 0 8px", wordBreak: "break-word" }}>
+          <p style={{ fontSize: 11, color: "hsl(var(--badge-muted))", margin: "0 0 8px", wordBreak: "break-word" }}>
             {a.email || a.phone}
           </p>
         )}
         <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
           {a.role && (
-            <span style={{ display: "inline-block", background: "hsl(var(--badge-red))", color: "hsl(var(--badge-alabaster))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+            <span style={{ display: "inline-block", background: "hsl(var(--badge-black))", color: "hsl(var(--badge-white))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
               {a.role}
             </span>
           )}
-          <span style={{ display: "inline-block", background: "hsl(var(--badge-red))", color: "hsl(var(--badge-alabaster))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
+          <span style={{ display: "inline-block", background: "hsl(var(--badge-black))", color: "hsl(var(--badge-white))", fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>
             Admit {a.admits || 1}
           </span>
         </div>

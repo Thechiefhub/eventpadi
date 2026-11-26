@@ -53,10 +53,12 @@
     --warm-brown: 25 35% 35%;
     --kente-red: 5 75% 50%;
 
-    /* Dedicated certificate badge palette */
-    --badge-red: 0 100% 40.1961%;
-    --badge-alabaster: 46.6667 21.875% 91.9608%;
-    --badge-shadow: 0 10px 30px -10px hsl(var(--badge-red) / 0.35);
+    /* Dedicated black-and-white QR badge palette */
+    --badge-black: 0 0% 7%;
+    --badge-white: 0 0% 100%;
+    --badge-paper: 0 0% 96%;
+    --badge-muted: 0 0% 42%;
+    --badge-shadow: 0 8px 24px -12px hsl(var(--badge-black) / 0.42);
 
     --gradient-sunset: linear-gradient(135deg, hsl(24 95% 53%), hsl(42 100% 50%));
     --gradient-indigo: linear-gradient(135deg, hsl(225 45% 18%), hsl(225 55% 30%));
@@ -209,12 +211,12 @@
   }
   .ring-genz { box-shadow: 0 0 0 2px hsl(330 95% 62% / 0.35), 0 0 0 6px hsl(270 90% 65% / 0.2); }
   .badge-surface {
-    background-color: hsl(var(--badge-red));
-    color: hsl(var(--badge-alabaster));
+    background-color: hsl(var(--badge-black));
+    color: hsl(var(--badge-white));
   }
   .badge-surface-soft {
-    background-color: hsl(var(--badge-alabaster));
-    color: hsl(var(--badge-red));
+    background-color: hsl(var(--badge-white));
+    color: hsl(var(--badge-black));
   }
   @keyframes blob {
     0%, 100% { transform: translate(0,0) scale(1); }
