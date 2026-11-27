@@ -2,3 +2,4 @@
 - [x] Recolor QR badges to deep red (#CD0000) and Alabaster (#EFEDE6), preserving unique QR rendering and logo fitting.
 - [x] Recolor QR badges to professional black and white without changing ticket details or QR behavior.
 - [x] Run existing checks and verify the badge preview after the palette update.
+- [ ] Make the D-Day scanner installable from a phone home screen with an event picker and no offline caching.

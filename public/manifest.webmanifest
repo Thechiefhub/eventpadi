@@ -1,0 +1,26 @@
+{
+  "id": "/scanner",
+  "name": "Myevent Door Scanner",
+  "short_name": "Door Scan",
+  "description": "Fast event check-in for door teams.",
+  "start_url": "/scanner",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#4269e0",
+  "background_color": "#fffbea",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

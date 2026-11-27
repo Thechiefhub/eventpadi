@@ -14,7 +14,18 @@ import { Mail, ArrowLeft } from "lucide-react";
 export default function Auth() {
   const { user, loading } = useAuth();
   const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get("returnTo");
+  const requestedReturnTo = searchParams.get("returnTo");
+  const returnTo = (() => {
+    if (!requestedReturnTo) return null;
+    try {
+      const target = new URL(requestedReturnTo, window.location.origin);
+      return target.origin === window.location.origin
+        ? `${target.pathname}${target.search}${target.hash}`
+        : null;
+    } catch {
+      return null;
+    }
+  })();
   const [isLogin, setIsLogin] = useState(true);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -95,8 +106,9 @@ export default function Auth() {
   const handleGoogleLogin = async () => {
     setPendingConfirmEmail(null);
     try {
+      const redirectPath = returnTo || "/dashboard";
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/dashboard",
+        redirect_uri: new URL(redirectPath, window.location.origin).toString(),
       });
       if (result.error) throw result.error;
     } catch (error: any) {
